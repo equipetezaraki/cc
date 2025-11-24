@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id           String    @id @default(uuid())
+  name         String
+  company      String?
+  email        String    @unique
+  phone        String
+  passwordHash String?
+  role         String    @default("CLIENT")
+  createdAt    DateTime  @default(now())
+  projects     Project[]
+}
+
+model ProjectTimeline {
+  id        String   @id @default(uuid())
+  projectId String
+  createdAt DateTime @default(now())
+  snapshot  Json
+  project   Project  @relation(fields: [projectId], references: [id])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+  password  String
+}
+
+model Briefing {
+  id             String   @id @default(uuid())
+  projectId      String   @unique
+  companyContext String?
+  projectContext String?
+  projectType    String?
+  systems        Json?
+  flowchartData  Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  project        Project  @relation(fields: [projectId], references: [id])
+}
+
+model Task {
+  id           String    @id @default(uuid())
+  title        String
+  description  String?
+  plannedStart DateTime
+  plannedEnd   DateTime
+  actualStart  DateTime?
+  actualEnd    DateTime?
+  isCompleted  Boolean   @default(false)
+  stageRef     Int?
+  assignedRole Role?
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id])
+}
+
+model ProjectStage {
+  id           String    @id @default(uuid())
+  projectId    String
+  stageNumber  Int       // 1-7
+  funnelNumber Int?      // null for stages 1-3,5-7; 1,2,3... for stage 4
+  isCompleted  Boolean   @default(false)
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  project      Project   @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, stageNumber, funnelNumber])
+}
+
+model Project {
+  id               String            @id @default(uuid())
+  name             String
+  startDate        DateTime
+  funnelCount      Int               @default(1)
+  status           String            @default("ONBOARDING")
+  currentStep      Int               @default(1)
+  requirementsLink String?
+  credentialsLink  String?
+  faqLink          String?
+  clientId         String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  briefing         Briefing?
+  client           Client            @relation(fields: [clientId], references: [id])
+  timelines        ProjectTimeline[]
+  tasks            Task[]
+  stages           ProjectStage[]
+}
+
+enum Role {
+  ADMIN
+  CLOSER
+  CRM
+  IA
+  PRODUCT_OWNER
+}
