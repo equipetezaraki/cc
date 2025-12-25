@@ -26,7 +26,14 @@ export default async function DeliveriesPage() {
         include: {
             project: {
                 select: {
-                    name: true
+                    name: true,
+                    stages: {
+                        select: {
+                            stageNumber: true,
+                            funnelNumber: true,
+                            endDate: true
+                        }
+                    }
                 }
             }
         },

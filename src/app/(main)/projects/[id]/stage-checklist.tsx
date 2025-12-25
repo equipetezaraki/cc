@@ -4,27 +4,34 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { CheckCircle2, Circle } from "lucide-react"
-import { useTransition } from "react"
-import { advanceProjectStage, toggleStage } from "./stage-actions"
+import { CheckCircle2, Circle, Calendar } from "lucide-react"
+import { useState, useTransition } from "react"
+import { advanceProjectStage, toggleStage, updateStageDate } from "./stage-actions"
 import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 
 interface ProjectStage {
     id: string
     stageNumber: number
     funnelNumber: number | null
     isCompleted: boolean
+    startDate: Date | null
+    endDate: Date | null
 }
 
 interface StageChecklistProps {
     projectId: string
     currentStep: number
     stages: ProjectStage[]
+    userRole: string
 }
 
 const STAGE_NAMES = [
     "N/A",
-    "1. Definição / Reunião",
+    "1. Onboarding",
     "2. Validação de Esboços",
     "3. Setup & Automações",
     "4. Desenvolvimento de Funis",
@@ -33,8 +40,11 @@ const STAGE_NAMES = [
     "7. Entrega Final"
 ]
 
-export function StageChecklist({ projectId, currentStep, stages }: StageChecklistProps) {
+export function StageChecklist({ projectId, currentStep, stages, userRole }: StageChecklistProps) {
     const [isPending, startTransition] = useTransition()
+    const [editingStageId, setEditingStageId] = useState<string | null>(null)
+
+    const canEditDates = userRole === 'ADMIN' || userRole === 'PRODUCT_OWNER'
 
     function handleAdvance() {
         if (!confirm("Tem certeza que deseja aprovar esta etapa e avançar?")) return
@@ -48,8 +58,17 @@ export function StageChecklist({ projectId, currentStep, stages }: StageChecklis
     }
 
     function handleToggle(stageId: string, checked: boolean) {
+        // Stages are now auto-completed based on task completion
+        // Checkbox is disabled to prevent manual toggling
+        return
+    }
+
+    function handleDateUpdate(stageId: string, date: Date | undefined) {
+        if (!date) return
+
         startTransition(async () => {
-            await toggleStage(stageId, checked, projectId)
+            await updateStageDate(stageId, date, projectId)
+            setEditingStageId(null)
         })
     }
 
@@ -72,18 +91,15 @@ export function StageChecklist({ projectId, currentStep, stages }: StageChecklis
             <CardHeader className="pb-3">
                 <CardTitle className="flex justify-between items-center text-lg">
                     <span>Checklist do Projeto</span>
-                    {currentStep <= 7 && (
-                        <Button onClick={handleAdvance} disabled={isPending} size="sm">
-                            {isPending ? "..." : "Aprovar Etapa"}
-                        </Button>
-                    )}
                 </CardTitle>
+                {/* Button removed as per request */}
             </CardHeader>
             <CardContent className="flex-1 p-0">
                 <ScrollArea className="px-6 pb-6">
                     <div className="space-y-4">
                         {STAGE_NAMES.slice(1).map((name, index) => {
                             const stageNum = index + 1
+
                             const stageItems = stagesByNumber[stageNum] || []
                             const isCurrent = stageNum === currentStep
                             const isPast = stageNum < currentStep
@@ -105,25 +121,62 @@ export function StageChecklist({ projectId, currentStep, stages }: StageChecklis
                                             <p className="text-xs text-muted-foreground italic">Sem sub-etapas.</p>
                                         )}
                                         {stageItems.map(stage => (
-                                            <div key={stage.id} className="flex items-start gap-2">
-                                                <Checkbox
-                                                    id={`stage-${stageNum}-${stage.id}`}
-                                                    checked={stage.isCompleted}
-                                                    onCheckedChange={(checked) => handleToggle(stage.id, checked as boolean)}
-                                                    disabled={isPending}
-                                                />
-                                                <label
-                                                    htmlFor={`stage-${stageNum}-${stage.id}`}
-                                                    className={cn(
-                                                        "text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer",
-                                                        stage.isCompleted && "line-through text-muted-foreground"
-                                                    )}
-                                                >
-                                                    {stage.funnelNumber
-                                                        ? `Funil ${stage.funnelNumber}`
-                                                        : name
-                                                    }
-                                                </label>
+                                            <div key={stage.id} className="flex items-start justify-between gap-2">
+                                                <div className="flex items-start gap-2 flex-1">
+                                                    <Checkbox
+                                                        id={`stage-${stageNum}-${stage.id}`}
+                                                        checked={stage.isCompleted}
+                                                        onCheckedChange={(checked) => handleToggle(stage.id, checked as boolean)}
+                                                        disabled={true}
+                                                    />
+                                                    <label
+                                                        htmlFor={`stage-${stageNum}-${stage.id}`}
+                                                        className={cn(
+                                                            "text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer",
+                                                            stage.isCompleted && "line-through text-muted-foreground"
+                                                        )}
+                                                    >
+                                                        {stage.funnelNumber
+                                                            ? `Funil ${stage.funnelNumber}`
+                                                            : name
+                                                        }
+                                                    </label>
+                                                </div>
+
+                                                {/* Date Display/Editor */}
+                                                {stage.endDate && (
+                                                    <div className="flex items-center gap-1">
+                                                        {canEditDates ? (
+                                                            <Popover open={editingStageId === stage.id} onOpenChange={(open) => setEditingStageId(open ? stage.id : null)}>
+                                                                <PopoverTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                                                        disabled={isPending}
+                                                                    >
+                                                                        <Calendar className="h-3 w-3 mr-1" />
+                                                                        {format(new Date(stage.endDate), "dd/MM/yy", { locale: ptBR })}
+                                                                    </Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="w-auto p-0" align="end">
+                                                                    <CalendarComponent
+                                                                        mode="single"
+                                                                        selected={new Date(stage.endDate)}
+                                                                        onSelect={(date) => handleDateUpdate(stage.id, date)}
+                                                                        disabled={isPending}
+                                                                        initialFocus
+                                                                    />
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                <Calendar className="h-3 w-3" />
+                                                                {format(new Date(stage.endDate), "dd/MM/yy", { locale: ptBR })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>

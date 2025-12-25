@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Calendar, CheckCircle2, Clock } from "lucide-react"
 import { format } from "date-fns"
 import Link from "next/link"
+import { ProjectGantt } from "@/components/meeting/project-gantt"
 
 export const dynamic = 'force-dynamic'
 
@@ -11,8 +12,8 @@ export default async function MeetingDashboardPage() {
     const data = await getMeetingDashboardData()
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-background p-8">
-            <header className="mb-8 flex justify-between items-center">
+        <div className="h-screen bg-gray-100 dark:bg-background p-8 flex flex-col overflow-hidden">
+            <header className="mb-4 flex justify-between items-center flex-shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-foreground">Painel de Reunião Semanal</h1>
                     <p className="text-muted-foreground">Visão geral de entregas e alertas para acompanhamento.</p>
@@ -29,7 +30,11 @@ export default async function MeetingDashboardPage() {
                 </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="w-full min-w-0 overflow-hidden flex-shrink-0 mb-4">
+                <ProjectGantt projects={data.ganttProjects} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0 overflow-y-auto">
                 {/* Column 1: Critical Alerts (Red) */}
                 <div className="space-y-4">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-red-700">

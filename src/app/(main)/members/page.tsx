@@ -12,6 +12,11 @@ export default async function MembersPage() {
     }
 
     const users = await prisma.user.findMany({
+        where: {
+            role: {
+                not: 'CLIENT' // Exclude clients from members list
+            }
+        },
         orderBy: { createdAt: 'desc' }
     })
 

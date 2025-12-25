@@ -1,0 +1,227 @@
+'use server'
+
+import { z } from 'zod'
+import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
+import { onboardingSchema } from '@/lib/schemas'
+import { calculateBusinessDate, addBusinessDays } from '@/lib/date-utils'
+import { generateStandardTasks } from '../deliveries/actions'
+import { ensureClientFolder } from '@/lib/google-drive'
+import bcrypt from 'bcryptjs'
+
+// Function to generate random password
+function generateRandomPassword(length: number = 12): string {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*'
+    let password = ''
+    for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length))
+    }
+    return password
+}
+
+// Function to send webhook notification
+async function sendWebhookNotification(projectData: any) {
+    try {
+        await fetch('https://workflowwebhook.tezaraki.com.br/webhook/novo-cliente', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(projectData),
+        })
+    } catch (error) {
+        console.error('Error sending webhook:', error)
+        // Don't fail the whole operation if webhook fails
+    }
+}
+
+export async function submitOnboarding(data: z.infer<typeof onboardingSchema>) {
+    const validatedFields = onboardingSchema.safeParse(data)
+
+    if (!validatedFields.success) {
+        return { error: "Dados inválidos. Verifique o formulário." }
+    }
+
+    const {
+        clientName, email, companyName, phone,
+        projectName, startDate, funnelCount
+    } = validatedFields.data
+
+    try {
+        // 1. Create Client with Login
+        // Generate random password
+        const randomPassword = generateRandomPassword()
+        const hashedPassword = await bcrypt.hash(randomPassword, 10)
+
+        const client = await prisma.client.create({
+            data: {
+                name: clientName,
+                company: companyName,
+            }
+
+        // 2. Calculate Dates (Corrected Logic)
+        // Etapa 1: Definição / Reunião (d0)
+        const s1Start = startDate
+        const s1End = calculateBusinessDate(s1Start, 2) // +2 dias úteis (Duration of S1)
+
+        // Etapa 2: Validação de Esboços
+        const s2Start = s1End
+        const s2End = calculateBusinessDate(s2Start, 3) // +3 dias úteis (Duration of S2)
+
+        // Etapa 3: Setup & Automações
+        const s3Start = s2End
+        const s3End = calculateBusinessDate(s3Start, 3) // +3 dias úteis (Duration of S3 - Fixed Bug)
+
+        // Etapa 4: Desenv. Comportamento (3 dias úteis por funil)
+        const s4Start = s3End
+        const daysForFunnel = 3 * funnelCount
+        const s4End = calculateBusinessDate(s4Start, daysForFunnel)
+
+        // Etapa 5: Go-Live (+1 dia útil)
+        const s5Start = s4End
+        const s5End = calculateBusinessDate(s5Start, 1)
+
+        // Etapa 6: Maturação (+30 dias corridos)
+        const s6Start = s5End
+        const s6End = new Date(s6Start)
+        s6End.setDate(s6End.getDate() + 30)
+
+        // Etapa 7: Entrega Final
+        const s7Start = s6End
+        const s7End = s6End // Milestone
+
+        // 3. Create Project
+        const project = await prisma.project.create({
+                data: {
+                    name: projectName,
+                    startDate,
+                    funnelCount,
+                    clientId: client.id,
+                    status: 'ONBOARDING',
+                    currentStep: 1,
+                }
+            })
+
+        // 3.1 Create Project Stages (Macro Control)
+        const stagesToCreate = []
+
+        // Etapa 1
+        stagesToCreate.push({
+                projectId: project.id,
+                stageNumber: 1,
+                funnelNumber: null,
+                isCompleted: false,
+                startDate: s1Start,
+                endDate: s1End
+            })
+
+        // Etapa 2
+        stagesToCreate.push({
+                projectId: project.id,
+                stageNumber: 2,
+                funnelNumber: null,
+                isCompleted: false,
+                startDate: s2Start,
+                endDate: s2End
+            })
+
+        // Etapa 3
+        stagesToCreate.push({
+                projectId: project.id,
+                stageNumber: 3,
+                funnelNumber: null,
+                isCompleted: false,
+                startDate: s3Start,
+                endDate: s3End
+            })
+
+        // Etapa 4: uma entrada por funil (Sequencial)
+        let currentFunnelStart = s4Start
+        for(let f = 1; f <= funnelCount; f++) {
+            const currentFunnelEnd = calculateBusinessDate(currentFunnelStart, 3)
+            stagesToCreate.push({
+                projectId: project.id,
+                stageNumber: 4,
+                funnelNumber: f,
+                isCompleted: false,
+                startDate: currentFunnelStart,
+                endDate: currentFunnelEnd
+            })
+            currentFunnelStart = currentFunnelEnd
+        }
+
+        // Etapa 5
+        stagesToCreate.push({
+            projectId: project.id,
+            stageNumber: 5,
+            funnelNumber: null,
+            isCompleted: false,
+            startDate: s5Start,
+            endDate: s5End
+        })
+
+        // Etapa 6
+        stagesToCreate.push({
+            projectId: project.id,
+            stageNumber: 6,
+            funnelNumber: null,
+            isCompleted: false,
+            startDate: s6Start,
+            endDate: s6End
+        })
+
+        // Etapa 7
+        stagesToCreate.push({
+            projectId: project.id,
+            stageNumber: 7,
+            funnelNumber: null,
+            isCompleted: false,
+            startDate: s7Start,
+            endDate: s7End
+        })
+
+        await prisma.projectStage.createMany({
+            data: stagesToCreate
+        })
+
+        // 4. Create Tasks (for team members - "Minhas Entregas")
+
+        // 4.1 Create specific Closer Briefing Task (not in standard CSV)
+        await prisma.task.create({
+            data: {
+                title: "Preencher Briefing (Contexto & Sistemas)",
+                description: "Tarefa exclusiva para o Closer preencher o contexto do projeto e desenhar os funis.",
+                plannedStart: startDate,
+                plannedEnd: calculateBusinessDate(startDate, 1),
+                assignedRole: 'CLOSER',
+                projectId: project.id,
+                isCompleted: false
+            }
+        })
+
+        // 4.2 Generate Standard Tasks (PO, IA, CRM)
+        await generateStandardTasks(project.id)
+
+        // 5. Send Webhook Notification
+        await sendWebhookNotification({
+            clientName,
+            clientEmail: email,
+            companyName,
+            phone,
+            projectName,
+            projectId: project.id,
+            startDate: startDate.toISOString(),
+            funnelCount,
+            clientCode: client.code,
+            driveFolderId: companyFolderId,
+            loginEmail: email,
+            loginPassword: randomPassword,
+        })
+
+    } catch (error) {
+        console.error("Error creating project:", error)
+        return { error: "Erro ao criar projeto. Tente novamente." }
+    }
+
+    redirect('/kanban')
+}

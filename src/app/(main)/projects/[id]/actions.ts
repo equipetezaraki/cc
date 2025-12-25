@@ -30,3 +30,39 @@ export async function getProjectDetails(id: string) {
 
     return project
 }
+
+export async function saveFaqLink(projectId: string, faqLink: string) {
+    try {
+        await prisma.project.update({
+            where: { id: projectId },
+            data: { faqLink }
+        })
+
+        // Find and complete the FAQ task
+        const faqTask = await prisma.task.findFirst({
+            where: {
+                projectId,
+                title: "Anexar Link do FAQ do Cliente"
+            }
+        })
+
+        if (faqTask && !faqTask.isCompleted) {
+            await prisma.task.update({
+                where: { id: faqTask.id },
+                data: {
+                    isCompleted: true,
+                    actualEnd: new Date()
+                }
+            })
+        }
+
+        revalidatePath(`/projects/${projectId}`)
+        revalidatePath('/dashboard')
+        revalidatePath('/deliveries')
+
+        return { success: true }
+    } catch (error) {
+        console.error("Error saving FAQ link:", error)
+        return { error: "Erro ao salvar link do FAQ." }
+    }
+}

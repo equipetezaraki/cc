@@ -129,8 +129,10 @@
   --destructive: #e2660e;
   --destructive-foreground: #ffffff;
 
-  --border: #1c1d3e;
-  --input: #1c1d3e;
+  --border: #2d2e52;
+  /* Lighter border for better visibility */
+  --input: #2d2e52;
+  /* Lighter input border for better visibility */
   --ring: #4dbaaf;
 
   --chart-1: #4dbaaf;

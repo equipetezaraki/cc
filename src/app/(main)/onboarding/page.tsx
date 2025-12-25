@@ -7,9 +7,9 @@ export default function OnboardingPage() {
             <div className="max-w-4xl mx-auto">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-2xl">Novo Projeto - Tezaraki OS</CardTitle>
+                        <CardTitle className="text-2xl">Novo Briefing - Tezaraki OS</CardTitle>
                         <CardDescription>
-                            Preencha os dados iniciais para gerar o cronograma e iniciar o fluxo.
+                            Preencha os dados iniciais para criar o cliente e iniciar o fluxo de onboarding.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

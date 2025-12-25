@@ -8,6 +8,11 @@ import { ArrowLeft, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { ArchiveButton } from "./archive-button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BriefingContainer } from "./briefing-container"
+import { getSession } from "@/lib/auth"
+import { Role } from "@prisma/client"
+import { FaqLinkManager } from "./faq-link-manager"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -16,6 +21,8 @@ interface PageProps {
 export default async function ProjectDetailsPage({ params }: PageProps) {
     const { id } = await params
     const project = await getProjectDetails(id)
+    const session = await getSession()
+    const userRole = session?.user?.role as Role || 'ADMIN'
 
     return (
         <div className="container mx-auto py-8 px-4 space-y-8">
@@ -42,64 +49,87 @@ export default async function ProjectDetailsPage({ params }: PageProps) {
                 </div>
             </div>
 
-            {/* Info Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Início do Projeto</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{format(project.startDate, "dd/MM/yyyy")}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Funis Contratados</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{project.funnelCount}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Links Rápidos</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-2">
-                        {project.requirementsLink && (
-                            <a href={project.requirementsLink} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                                <ExternalLink className="h-3 w-3" /> Requisitos
-                            </a>
-                        )}
-                        {project.credentialsLink && (
-                            <a href={project.credentialsLink} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                                <ExternalLink className="h-3 w-3" /> Credenciais
-                            </a>
-                        )}
-                        {!project.requirementsLink && !project.credentialsLink && (
-                            <span className="text-sm text-muted-foreground">Nenhum link cadastrado</span>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+            <Tabs defaultValue="overview" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+                    <TabsTrigger value="briefing">Briefing</TabsTrigger>
+                </TabsList>
 
-            {/* Checklist & Gantt Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-4">
-                    <h2 className="text-xl font-semibold">Cronograma (Gantt)</h2>
-                    <StageGantt
-                        stages={project.stages}
-                        projectStartDate={project.startDate}
-                        funnelCount={project.funnelCount}
-                    />
-                </div>
-                <div className="space-y-4">
-                    <StageChecklist
+                <TabsContent value="overview" className="space-y-8">
+                    {/* Info Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Início do Projeto</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{format(project.startDate, "dd/MM/yyyy")}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Funis Contratados</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{project.funnelCount}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Links Rápidos</CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-2">
+                                {project.requirementsLink && (
+                                    <a href={project.requirementsLink} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                                        <ExternalLink className="h-3 w-3" /> Requisitos
+                                    </a>
+                                )}
+                                {project.credentialsLink && (
+                                    <a href={project.credentialsLink} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                                        <ExternalLink className="h-3 w-3" /> Credenciais
+                                    </a>
+                                )}
+                                <FaqLinkManager
+                                    projectId={project.id}
+                                    currentFaqLink={project.faqLink}
+                                    canEdit={userRole === 'ADMIN' || userRole === 'PRODUCT_OWNER'}
+                                />
+                                {!project.requirementsLink && !project.credentialsLink && !project.faqLink && (
+                                    <span className="text-sm text-muted-foreground">Nenhum link cadastrado</span>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Checklist & Gantt Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 space-y-4">
+                            <h2 className="text-xl font-semibold">Cronograma (Gantt)</h2>
+                            <StageGantt
+                                stages={project.stages}
+                                projectStartDate={project.startDate}
+                                funnelCount={project.funnelCount}
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            <StageChecklist
+                                projectId={project.id}
+                                currentStep={project.currentStep}
+                                stages={project.stages}
+                                userRole={userRole}
+                            />
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="briefing">
+                    <BriefingContainer
                         projectId={project.id}
-                        currentStep={project.currentStep}
-                        stages={project.stages}
+                        initialData={project.briefing}
+                        canEdit={userRole === 'ADMIN'}
                     />
-                </div>
-            </div>
+                </TabsContent>
+            </Tabs>
         </div>
     )
 }

@@ -30,7 +30,7 @@ import { useTheme } from 'next-themes'
 
 
 const initialNodes: Node[] = [
-    { id: '1', position: { x: 250, y: 0 }, data: { label: 'Início do Funil' }, type: 'funnel' },
+    { id: '1', position: { x: 280, y: 0 }, data: { label: 'Início do Funil', description: '' }, type: 'funnel' },
 ];
 
 const initialEdges: Edge[] = [];
@@ -40,10 +40,11 @@ interface SystemRow {
     usage: string
 }
 
-export function BriefingForm({ projectId, initialData }: { projectId: string, initialData: any }) {
+export function BriefingForm({ projectId, initialData, onCancel, onSuccess }: { projectId: string, initialData: any, onCancel?: () => void, onSuccess?: () => void }) {
     const [isPending, startTransition] = useTransition()
     const { theme } = useTheme()
     const [mounted, setMounted] = useState(false)
+    const [isFullscreen, setIsFullscreen] = useState(false)
 
     useEffect(() => {
         setMounted(true)
@@ -118,15 +119,16 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
 
             // Calculate new position based on direction
             if (direction === 'top') position = { x: sourceNode.position.x, y: sourceNode.position.y - offset };
-            if (direction === 'right') position = { x: sourceNode.position.x + offset + 50, y: sourceNode.position.y };
+            if (direction === 'right') position = { x: sourceNode.position.x + offset + 80, y: sourceNode.position.y };
             if (direction === 'bottom') position = { x: sourceNode.position.x, y: sourceNode.position.y + offset };
-            if (direction === 'left') position = { x: sourceNode.position.x - offset - 50, y: sourceNode.position.y };
+            if (direction === 'left') position = { x: sourceNode.position.x - offset - 80, y: sourceNode.position.y };
 
             const newNode: Node = {
                 id: newId,
                 position,
                 data: {
                     label: 'Nova Etapa',
+                    description: '',
                     onAddConnectedStage: handleAddConnectedStage
                 },
                 type: 'funnel',
@@ -226,8 +228,8 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
         const id = Math.random().toString()
         const newNode: Node = {
             id,
-            position: { x: 100, y: 100 },
-            data: { label: 'Nova Etapa' },
+            position: { x: 120, y: 120 },
+            data: { label: 'Nova Etapa', description: '' },
             type: 'funnel'
         }
         setNodes((nds) => nds.concat(newNode))
@@ -237,7 +239,7 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
         const groupId = Math.random().toString()
         const groupNode: Node = {
             id: groupId,
-            position: { x: 50, y: 50 },
+            position: { x: 80, y: 80 },
             data: {
                 label: 'Novo Funil',
             },
@@ -250,9 +252,10 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
         const stageId = Math.random().toString()
         const initialStage: Node = {
             id: stageId,
-            position: { x: 50, y: 80 },
+            position: { x: 40, y: 40 },
             data: {
                 label: 'Início',
+                description: '',
                 onAddConnectedStage: handleAddConnectedStage
             },
             type: 'funnel',
@@ -303,14 +306,35 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
     // Save Handler
     const handleSave = () => {
         startTransition(async () => {
+            // Sanitize nodes and edges to remove non-serializable data (like functions, symbols)
+            const sanitizedNodes = nodes.map(node => {
+                const { data, ...rest } = node;
+                // Create a clean data object without functions
+                const cleanData = Object.entries(data).reduce((acc, [key, value]) => {
+                    if (typeof value !== 'function') {
+                        acc[key] = value;
+                    }
+                    return acc;
+                }, {} as Record<string, any>);
+
+                return {
+                    ...rest,
+                    data: cleanData
+                };
+            });
+
             const data = {
                 companyContext,
                 projectType,
                 projectContext,
                 systems,
-                flowchartData: { nodes, edges }
+                flowchartData: {
+                    nodes: sanitizedNodes,
+                    edges
+                }
             }
             await saveBriefing(projectId, data)
+            if (onSuccess) onSuccess()
         })
     }
 
@@ -398,12 +422,15 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
             </Card>
 
             {/* 3. Estrutura de CRM / Funil */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>3. Desenho do Funil</CardTitle>
+            <Card className={isFullscreen ? "fixed inset-0 z-50 rounded-none flex flex-col" : ""}>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>3. Desenho do Funil (CRM)</CardTitle>
+                    <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)}>
+                        {isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+                    </Button>
                 </CardHeader>
-                <CardContent>
-                    <div className="h-[600px] border rounded-lg bg-gray-50 dark:bg-zinc-950/50 overflow-hidden">
+                <CardContent className={isFullscreen ? "flex-1 p-0" : ""}>
+                    <div className={`${isFullscreen ? "h-full" : "h-[600px]"} border rounded-lg bg-gray-50 dark:bg-zinc-950/50 overflow-hidden`}>
                         <ReactFlow
                             nodes={nodes}
                             edges={edges}
@@ -428,11 +455,14 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
                             panOnScroll={false}
                             zoomOnScroll={true}
                             deleteKeyCode={['Delete', 'Backspace']}
+                            snapToGrid={true}
+                            snapGrid={[20, 20]}
                         >
                             <Background
                                 className="dark:bg-zinc-950/50"
                                 color={theme === 'dark' ? '#52525b' : '#94a3b8'}
-                                gap={16}
+                                gap={20}
+                                size={1}
                             />
                             <Controls showInteractive={false} />
                             <Panel position="top-right" className="bg-background/90 p-2 rounded-lg border shadow-sm backdrop-blur-sm flex flex-col gap-2">
@@ -443,6 +473,7 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
                                     <Button size="sm" variant="outline" onClick={handleAddNode} className="w-full gap-2">
                                         <Plus className="h-4 w-4" /> Etapa Solta
                                     </Button>
+
 
                                     {selectedNodeId && (
                                         <div className="space-y-2 pt-2 border-t">
@@ -458,13 +489,20 @@ export function BriefingForm({ projectId, initialData }: { projectId: string, in
                             </Panel>
                         </ReactFlow>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                        Arraste nós para desenhar o fluxo. Use os controles para zoom.
-                    </p>
+                    {!isFullscreen && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                            Arraste nós para desenhar o fluxo. Use os controles para zoom.
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 
-            <div className="flex justify-end pb-12">
+            <div className="flex justify-end gap-2 pb-12">
+                {onCancel && (
+                    <Button variant="outline" size="lg" onClick={onCancel} disabled={isPending}>
+                        Cancelar
+                    </Button>
+                )}
                 <Button size="lg" onClick={handleSave} disabled={isPending} className="gap-2">
                     <Save className="h-4 w-4" />
                     {isPending ? "Salvando..." : "Salvar Briefing"}

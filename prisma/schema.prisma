@@ -8,15 +8,18 @@ datasource db {
 }
 
 model Client {
-  id           String    @id @default(uuid())
-  name         String
-  company      String?
-  email        String    @unique
-  phone        String
-  passwordHash String?
-  role         String    @default("CLIENT")
-  createdAt    DateTime  @default(now())
-  projects     Project[]
+  id            String    @id @default(uuid())
+  name          String
+  company       String?
+  email         String    @unique
+  phone         String
+  passwordHash  String?
+  role          String    @default("CLIENT")
+  code          Int       @default(autoincrement())
+  driveFolderId String?
+  createdAt     DateTime  @default(now())
+  projects      Project[]
+  feedbacks     Feedback[]
 }
 
 model ProjectTimeline {
@@ -24,7 +27,7 @@ model ProjectTimeline {
   projectId String
   createdAt DateTime @default(now())
   snapshot  Json
-  project   Project  @relation(fields: [projectId], references: [id])
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model User {
@@ -46,7 +49,7 @@ model Briefing {
   flowchartData  Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  project        Project  @relation(fields: [projectId], references: [id])
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Task {
@@ -61,40 +64,131 @@ model Task {
   stageRef     Int?
   assignedRole Role?
   projectId    String
-  project      Project   @relation(fields: [projectId], references: [id])
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model ProjectStage {
   id           String    @id @default(uuid())
   projectId    String
-  stageNumber  Int       // 1-7
-  funnelNumber Int?      // null for stages 1-3,5-7; 1,2,3... for stage 4
+  stageNumber  Int // 1-7
+  funnelNumber Int? // null for stages 1-3,5-7; 1,2,3... for stage 4
   isCompleted  Boolean   @default(false)
+  startDate    DateTime?
+  endDate      DateTime?
   completedAt  DateTime?
   createdAt    DateTime  @default(now())
-  project      Project   @relation(fields: [projectId], references: [id])
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, stageNumber, funnelNumber])
 }
 
 model Project {
-  id               String            @id @default(uuid())
-  name             String
-  startDate        DateTime
-  funnelCount      Int               @default(1)
-  status           String            @default("ONBOARDING")
-  currentStep      Int               @default(1)
-  requirementsLink String?
-  credentialsLink  String?
-  faqLink          String?
-  clientId         String
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  briefing         Briefing?
-  client           Client            @relation(fields: [clientId], references: [id])
-  timelines        ProjectTimeline[]
-  tasks            Task[]
-  stages           ProjectStage[]
+  id                     String            @id @default(uuid())
+  name                   String
+  startDate              DateTime
+  funnelCount            Int               @default(1)
+  status                 String            @default("ONBOARDING")
+  currentStep            Int               @default(1)
+  requirementsLink       String?
+  credentialsLink        String?
+  faqLink                String?
+  clientId               String
+  driveFolderId          String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  briefing               Briefing?
+  openAiKey              String?
+  openRouterKey          String?
+  faqConfirmed           Boolean           @default(false)
+  speakingStyleConfirmed Boolean           @default(false)
+  googleSheetUrl         String?
+  meetingDate            DateTime?
+  client                 Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  timelines              ProjectTimeline[]
+  tasks                  Task[]
+  stages                 ProjectStage[]
+
+  // Analytics Relations
+  activeConversations ActiveConversation[]
+  messageHistory      MessageHistory[]
+  aiInsights          AiInsight[]
+}
+
+model ActiveConversation {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sessionId   String? @map("session_id")
+  leadId      BigInt? @map("lead_id")
+  chatId      String? @map("chat_id")
+  recipientId String? @map("recipient_id")
+
+  crmDialogId  BigInt? @map("crm_dialog_id")
+  crmContactId BigInt? @map("crm_contact_id")
+  crmAccountId BigInt? @map("crm_account_id")
+
+  leadName    String? @map("lead_name")
+  funnelStage String? @default("Novo") @map("funnel_stage")
+
+  dtUltimaMensagem DateTime? @map("dt_ultima_mensagem")
+  msgAnterior      String?   @map("msg_anterior")
+  ultimaResposta   String?   @map("ultima_resposta")
+  msgPool          String?   @map("msg_pool")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  messages MessageHistory[]
+  insights AiInsight[]
+
+  @@index([projectId])
+  @@index([sessionId])
+  @@index([funnelStage])
+  @@map("active_conversations")
+}
+
+model MessageHistory {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  conversationId String?             @map("conversation_id")
+  conversation   ActiveConversation? @relation(fields: [conversationId], references: [id])
+
+  sessionId String? @map("session_id")
+
+  messageData Json @map("message_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  senderType     String? @map("sender_type")
+  messageContent String? @map("message_content")
+
+  @@index([projectId])
+  @@index([createdAt])
+  @@index([senderType])
+  @@map("message_history")
+}
+
+model AiInsight {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  conversationId String?             @map("conversation_id")
+  conversation   ActiveConversation? @relation(fields: [conversationId], references: [id])
+
+  sentimentLabel     String?  @map("sentiment_label")
+  topicsDetected     String[] @map("topics_detected")
+  objectionsDetected String[] @map("objections_detected")
+  intentDetected     String?  @map("intent_detected")
+
+  aiHandledFully          Boolean @default(false) @map("ai_handled_fully")
+  humanInterventionNeeded Boolean @default(false) @map("human_intervention_needed")
+
+  analyzedAt DateTime @default(now()) @map("analyzed_at")
+
+  @@map("ai_insights")
 }
 
 enum Role {
@@ -103,4 +197,57 @@ enum Role {
   CRM
   IA
   PRODUCT_OWNER
+  CLIENT
+}
+
+model StageTemplate {
+  id          String         @id @default(uuid())
+  name        String
+  stageNumber Int            @unique
+  kanbanColumn String?       // e.g., "onboarding", "step-2", "done"
+  durationDays Int           @default(0)
+  trigger      String?       // Description of what triggers this stage or previous requirement
+  tasks       TaskTemplate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stage_templates")
+}
+
+model TaskTemplate {
+  id          String  @id @default(uuid())
+  title       String
+  description String?
+  durationDays Int     @default(0)
+  trigger      String?
+
+  stageTemplateId String        @map("stage_template_id")
+  stageTemplate   StageTemplate @relation(fields: [stageTemplateId], references: [id], onDelete: Cascade)
+
+  role Role @default(CRM) // IA, PRODUCT_OWNER defined in Role enum
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("task_templates")
+}
+
+model Feedback {
+  id                String         @id @default(uuid())
+  clientId          String
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  content           String         @db.Text
+  location          String
+  status            FeedbackStatus @default(PENDING)
+  conclusionComment String?        @db.Text
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([clientId])
+}
+
+enum FeedbackStatus {
+  PENDING
+  COMPLETED
 }

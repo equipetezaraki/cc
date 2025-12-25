@@ -6,59 +6,120 @@ import { prisma } from '@/lib/prisma'
 import { onboardingSchema } from '@/lib/schemas'
 import { calculateBusinessDate, addBusinessDays } from '@/lib/date-utils'
 import { generateStandardTasks } from '../deliveries/actions'
+import { ensureClientFolder } from '@/lib/google-drive'
+import bcrypt from 'bcryptjs'
 
-export async function submitOnboarding(data: z.infer<typeof onboardingSchema>) {
+// Function to generate random password
+function generateRandomPassword(length: number = 12): string {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*'
+    let password = ''
+    for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length))
+    }
+    return password
+}
+
+// Function to send webhook notification
+async function sendWebhookNotification(projectData: any) {
+    try {
+        await fetch('https://workflowwebhook.tezaraki.com.br/webhook/novo-cliente', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(projectData),
+        })
+    } catch (error) {
+        console.error('Error sending webhook:', error)
+        // Don't fail the whole operation if webhook fails
+    }
+}
+
+export async function submitBriefing(data: any) {
+    console.log('🚀 submitBriefing called with data:', data)
+
+    // Validate core fields
     const validatedFields = onboardingSchema.safeParse(data)
 
     if (!validatedFields.success) {
+        console.error('❌ Validation failed:', validatedFields.error)
         return { error: "Dados inválidos. Verifique o formulário." }
     }
 
     const {
-        clientName, companyName, phone,
-        projectName, startDate, funnelCount
+        clientName, email, companyName, phone,
+        projectName, funnelCount
     } = validatedFields.data
 
-    try {
-        // 1. Create Client
-        // Generate unique placeholder email using UUID to avoid duplicates
-        const uniqueId = crypto.randomUUID().split('-')[0]
-        const placeholderEmail = `client-${uniqueId}@placeholder.com`
+    // Extract extra briefing data
+    const { companyContext, projectType, projectContext, systems, flowchartData } = data
 
-        const client = await prisma.client.create({
-            data: {
-                name: clientName,
-                company: companyName,
-                email: placeholderEmail,
-                phone,
-            }
+    // Placeholder start date (will be updated by PO later)
+    const startDate = new Date()
+
+    console.log('✅ Validation passed, checking for existing client...')
+
+    try {
+        // 1. Check if Client already exists
+        let client = await prisma.client.findUnique({
+            where: { email }
         })
 
-        // 2. Calculate Dates (The Core Logic)
-        // Etapa 1: Definição / Reunião (d0)
-        const dateStep1 = startDate
+        let randomPassword = ''
+        let isNewClient = false
+        let companyFolderId: string | null = null
 
-        // Etapa 2: Validação de Esboços (d0 + 2 dias úteis)
-        const dateStep2 = calculateBusinessDate(dateStep1, 2)
+        if (!client) {
+            // Client doesn't exist, create new one
+            isNewClient = true
+            randomPassword = generateRandomPassword()
+            const hashedPassword = await bcrypt.hash(randomPassword, 10)
 
-        // Etapa 3: Setup & Automações (Fim da Etapa 2 + 3 dias úteis)
-        const dateStep3 = calculateBusinessDate(dateStep2, 3)
+            console.log('🔐 Creating new client with email:', email)
 
-        // Etapa 4: Desenv. Comportamento (Fim da Etapa 3 + (3 * num_funis) dias úteis)
-        const daysForFunnel = 3 * funnelCount
-        const dateStep4 = calculateBusinessDate(dateStep3, daysForFunnel)
+            client = await prisma.client.create({
+                data: {
+                    name: clientName,
+                    company: companyName,
+                    email: email,
+                    phone,
+                    passwordHash: hashedPassword,
+                }
+            })
 
-        // Etapa 5: Go-Live (Fim da Etapa 4 + 1 dia corrido/útil - using business for safety)
-        const dateStep5 = calculateBusinessDate(dateStep4, 1)
+            console.log('✅ Client created:', client.id)
 
-        // Etapa 6: Maturação (Início da Op. (Step 5) + 30 dias corridos)
-        const dateStep6 = new Date(dateStep5)
-        dateStep6.setDate(dateStep6.getDate() + 30)
+            // 1.1 Create User for client login (role: CLIENT)
+            console.log('👤 Creating user for client login...')
+            await prisma.user.create({
+                data: {
+                    name: clientName,
+                    email: email,
+                    password: hashedPassword,
+                    role: 'CLIENT',
+                }
+            })
 
-        // Etapa 7: Entrega Final (Data do Fim da Maturação)
-        const dateStep7 = dateStep6
+            console.log(`🔐 Client login created - Email: ${email}, Password: ${randomPassword}`)
 
-        // 3. Create Project
+            // 1.2 Create Google Drive Company Folder (if not exists)
+            // Format: "001 - Company Name"
+            companyFolderId = await ensureClientFolder(companyName, client.code)
+
+            // Update client with Drive folder ID
+            if (companyFolderId) {
+                await prisma.client.update({
+                    where: { id: client.id },
+                    data: { driveFolderId: companyFolderId }
+                })
+            }
+        } else {
+            console.log('✅ Using existing client:', client.id)
+            companyFolderId = client.driveFolderId
+        }
+
+
+        // 2. Create Project (Status: ONBOARDING)
         const project = await prisma.project.create({
             data: {
                 name: projectName,
@@ -70,60 +131,64 @@ export async function submitOnboarding(data: z.infer<typeof onboardingSchema>) {
             }
         })
 
-        // 3.1 Create Project Stages (Macro Control)
-        const stagesToCreate = []
-
-        // Etapas 1-3: uma entrada cada
-        for (let i = 1; i <= 3; i++) {
-            stagesToCreate.push({
+        // 3.1 Create Briefing Record
+        await prisma.briefing.create({
+            data: {
                 projectId: project.id,
-                stageNumber: i,
-                funnelNumber: null,
-                isCompleted: false
-            })
-        }
-
-        // Etapa 4: uma entrada por funil
-        for (let f = 1; f <= funnelCount; f++) {
-            stagesToCreate.push({
-                projectId: project.id,
-                stageNumber: 4,
-                funnelNumber: f,
-                isCompleted: false
-            })
-        }
-
-        // Etapas 5-7: uma entrada cada
-        for (let i = 5; i <= 7; i++) {
-            stagesToCreate.push({
-                projectId: project.id,
-                stageNumber: i,
-                funnelNumber: null,
-                isCompleted: false
-            })
-        }
-
-        await prisma.projectStage.createMany({
-            data: stagesToCreate
+                companyContext,
+                projectType,
+                projectContext,
+                systems,
+                flowchartData
+            }
         })
 
-        // 4. Create Tasks (for team members - "Minhas Entregas")
-
-        // 4.1 Create specific Closer Briefing Task (not in standard CSV)
+        // 3.2 Create Task for Product Owner to start onboarding
         await prisma.task.create({
             data: {
-                title: "Preencher Briefing (Contexto & Sistemas)",
-                description: "Tarefa exclusiva para o Closer preencher o contexto do projeto e desenhar os funis.",
-                plannedStart: startDate,
-                plannedEnd: calculateBusinessDate(startDate, 1),
-                assignedRole: 'CLOSER',
+                title: "Iniciar onboarding com cliente",
+                description: `Confirmar recebimento de credenciais, documentos para a base de conhecimento e requisitos preenchidos. Agendar reunião de alinhamento com o cliente.`,
+                plannedStart: new Date(),
+                plannedEnd: calculateBusinessDate(new Date(), 1), // 1 day SLA
+                assignedRole: 'PRODUCT_OWNER',
                 projectId: project.id,
                 isCompleted: false
             }
         })
 
-        // 4.2 Generate Standard Tasks (PO, IA, CRM)
-        await generateStandardTasks(project.id)
+        // 3.3 Create Task for Product Owner to attach FAQ link
+        await prisma.task.create({
+            data: {
+                title: "Anexar Link do FAQ do Cliente",
+                description: `Acesse o projeto e anexe o link do FAQ do cliente ${companyName}. O FAQ foi criado automaticamente no Google Drive.`,
+                plannedStart: new Date(),
+                plannedEnd: calculateBusinessDate(new Date(), 1), // 1 day SLA
+                assignedRole: 'PRODUCT_OWNER',
+                projectId: project.id,
+                isCompleted: false
+            }
+        })
+
+        // 4. Send Webhook Notification
+        await sendWebhookNotification({
+            clientName,
+            clientEmail: email,
+            companyName,
+            phone,
+            projectName,
+            projectId: project.id,
+            startDate: startDate.toISOString(),
+            funnelCount,
+            clientCode: client.code,
+            driveFolderId: companyFolderId,
+            loginEmail: email,
+            ...(isNewClient && { loginPassword: randomPassword }), // Only include password for new clients
+            isNewClient,
+            // Add technical briefing data to webhook if needed
+            companyContext,
+            projectType,
+            projectContext,
+        })
 
     } catch (error) {
         console.error("Error creating project:", error)

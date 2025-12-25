@@ -7,7 +7,7 @@ export default async function KanbanPage() {
     const projects = await getProjects()
 
     return (
-        <div className="h-screen flex flex-col">
+        <div className="h-[calc(100vh-4rem)] flex flex-col">
             <header className="border-b p-4 bg-background">
                 <h1 className="text-xl font-bold">Quadro de Projetos</h1>
             </header>

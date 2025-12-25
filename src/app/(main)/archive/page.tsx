@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import Link from "next/link"
 import { Archive } from "lucide-react"
+import { DeleteProjectButton } from "@/components/delete-project-button"
 
 export const dynamic = 'force-dynamic'
 
@@ -42,25 +43,33 @@ export default async function ArchivePage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {archivedProjects.map(project => (
-                        <Link key={project.id} href={`/projects/${project.id}`}>
-                            <Card className="hover:bg-gray-50 dark:hover:bg-accent transition-colors cursor-pointer border-l-4 border-l-gray-400 dark:border-l-muted">
-                                <CardHeader className="pb-2">
-                                    <div className="flex justify-between items-start">
-                                        <Badge variant="outline" className="bg-gray-100 dark:bg-muted text-gray-600 dark:text-muted-foreground border-gray-200 dark:border-border">
-                                            Arquivado
-                                        </Badge>
-                                        <span className="text-xs text-muted-foreground">
-                                            {format(project.createdAt, "dd/MM/yyyy")}
-                                        </span>
-                                    </div>
-                                    <CardTitle className="text-lg">{project.name}</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-muted-foreground mb-1">{project.client.name}</p>
-                                    <p className="text-xs text-gray-400 dark:text-muted-foreground">{project.client.company}</p>
-                                </CardContent>
-                            </Card>
-                        </Link>
+                        <div key={project.id} className="relative">
+                            <Link href={`/projects/${project.id}`}>
+                                <Card className="hover:bg-gray-50 dark:hover:bg-accent transition-colors cursor-pointer border-l-4 border-l-gray-400 dark:border-l-muted">
+                                    <CardHeader className="pb-2">
+                                        <div className="flex justify-between items-start gap-2 mb-2">
+                                            <Badge variant="outline" className="bg-gray-100 dark:bg-muted text-gray-600 dark:text-muted-foreground border-gray-200 dark:border-border">
+                                                Arquivado
+                                            </Badge>
+                                        </div>
+                                        <CardTitle className="text-lg pr-10">{project.name}</CardTitle>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Criado em {format(project.createdAt, "dd/MM/yyyy")}
+                                        </p>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm text-muted-foreground mb-1">{project.client.name}</p>
+                                        <p className="text-xs text-gray-400 dark:text-muted-foreground">{project.client.company}</p>
+                                    </CardContent>
+                                </Card>
+                            </Link>
+                            <div className="absolute top-4 right-4 z-10">
+                                <DeleteProjectButton
+                                    projectId={project.id}
+                                    projectName={project.name}
+                                />
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}

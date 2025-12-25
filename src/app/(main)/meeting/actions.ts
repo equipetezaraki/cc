@@ -27,13 +27,22 @@ export type DashboardData = {
         isLate: boolean
         nextDeadline: Date | null
     }[]
+    ganttProjects: {
+        id: string
+        name: string
+        clientName: string
+        implementationStart: Date
+        implementationEnd: Date | null
+        maintenanceStart: Date | null
+        maintenanceEnd: Date | null
+    }[]
 }
 
 export async function getMeetingDashboardData(): Promise<DashboardData> {
     const today = startOfDay(new Date())
     const nextWeek = addDays(today, 7)
 
-    // Fetch all active projects with their tasks
+    // Fetch all active projects with their tasks and stages
     const projects = await prisma.project.findMany({
         where: {
             status: {
@@ -51,13 +60,15 @@ export async function getMeetingDashboardData(): Promise<DashboardData> {
                 orderBy: {
                     plannedEnd: 'asc'
                 }
-            }
+            },
+            stages: true
         }
     })
 
     const overdueTasks: DashboardData['overdueTasks'] = []
     const upcomingTasks: DashboardData['upcomingTasks'] = []
     const projectHealth: DashboardData['projectHealth'] = []
+    const ganttProjects: DashboardData['ganttProjects'] = []
 
     for (const project of projects) {
         // Determine project health
@@ -96,11 +107,31 @@ export async function getMeetingDashboardData(): Promise<DashboardData> {
                 })
             }
         }
+
+        // Process Gantt Data
+        // Implementation: Start -> Stage 5 (Go-Live) End
+        // Maintenance: Stage 5 End -> Stage 7 (Final) End
+        const stage2 = project.stages.find(s => s.stageNumber === 2)
+        const stage5 = project.stages.find(s => s.stageNumber === 5)
+        const stage7 = project.stages.find(s => s.stageNumber === 7)
+
+        if (stage5?.endDate) {
+            ganttProjects.push({
+                id: project.id,
+                name: project.name,
+                clientName: project.client.name,
+                implementationStart: stage2?.endDate || project.startDate,
+                implementationEnd: stage5.endDate,
+                maintenanceStart: stage5.endDate,
+                maintenanceEnd: stage7?.endDate || null
+            })
+        }
     }
 
     // Sort lists
     overdueTasks.sort((a, b) => a.plannedEnd.getTime() - b.plannedEnd.getTime())
     upcomingTasks.sort((a, b) => a.plannedEnd.getTime() - b.plannedEnd.getTime())
+    ganttProjects.sort((a, b) => a.implementationStart.getTime() - b.implementationStart.getTime())
     projectHealth.sort((a, b) => {
         // Sort by late first, then by deadline
         if (a.isLate && !b.isLate) return -1
@@ -113,6 +144,7 @@ export async function getMeetingDashboardData(): Promise<DashboardData> {
     return {
         overdueTasks,
         upcomingTasks,
-        projectHealth
+        projectHealth,
+        ganttProjects
     }
 }

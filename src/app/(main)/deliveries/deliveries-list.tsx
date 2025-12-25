@@ -26,6 +26,36 @@ interface TaskWithProject {
     projectId: string
     project: {
         name: string
+        stages: {
+            stageNumber: number
+            funnelNumber: number | null
+            endDate: Date | null
+        }[]
+    }
+}
+
+const STAGE_NAMES: Record<number, string> = {
+    1: "Onboarding",
+    2: "Validação",
+    3: "Setup",
+    4: "Desenv. Funis",
+    5: "Go-Live",
+    6: "Maturação",
+    7: "Entrega Final"
+}
+
+function getTaskStageInfo(task: TaskWithProject) {
+    const matchingStage = task.project.stages.find(stage =>
+        stage.endDate && task.plannedEnd &&
+        new Date(stage.endDate).getTime() === new Date(task.plannedEnd).getTime()
+    )
+
+    if (!matchingStage) return null
+
+    return {
+        stageNumber: matchingStage.stageNumber,
+        stageName: STAGE_NAMES[matchingStage.stageNumber] || `Etapa ${matchingStage.stageNumber}`,
+        funnelNumber: matchingStage.funnelNumber
     }
 }
 
@@ -38,7 +68,10 @@ export function DeliveriesList({ tasks, userRole }: { tasks: TaskWithProject[], 
 
     const handleToggle = (taskId: string, currentStatus: boolean) => {
         startTransition(async () => {
-            await toggleTaskCompletion(taskId, !currentStatus)
+            const result = await toggleTaskCompletion(taskId, !currentStatus)
+            if (result?.error) {
+                toast.error(result.error)
+            }
         })
     }
 
@@ -84,21 +117,17 @@ export function DeliveriesList({ tasks, userRole }: { tasks: TaskWithProject[], 
     }, {} as Record<string, TaskWithProject[]>)
 
     // Sort keys
+    // Sort keys
     const sortedKeys = Object.keys(groupedTasks).sort((a, b) => {
         if (viewMode === 'PROJECT') return a.localeCompare(b)
 
-        // Custom sort for Date view keys
-        if (a === "Hoje") return -1
-        if (b === "Hoje") return 1
-        if (a === "Amanhã") return -1 // After Today
-        if (b === "Amanhã") return 1
-        if (a === "Ontem") return -1 // Before Today
-        if (b === "Ontem") return 1
+        // Sort by date (ascending)
+        const taskA = groupedTasks[a][0]
+        const taskB = groupedTasks[b][0]
 
-        // Fallback to string comparison for formatted dates (not ideal but works for simple cases)
-        // Ideally we'd sort by the actual date object, but we lost it in the key
-        // For a robust solution we might need a Map or different structure
-        return a.localeCompare(b)
+        if (!taskA || !taskB) return 0
+
+        return new Date(taskA.plannedEnd).getTime() - new Date(taskB.plannedEnd).getTime()
     })
 
     return (
@@ -187,7 +216,18 @@ export function DeliveriesList({ tasks, userRole }: { tasks: TaskWithProject[], 
                                             <p className={cn("font-medium leading-none text-foreground", task.isCompleted && "line-through text-muted-foreground")}>
                                                 {task.title}
                                             </p>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {(() => {
+                                                    const stageInfo = getTaskStageInfo(task)
+                                                    return stageInfo && (
+                                                        <Badge variant="default" className="text-xs font-normal bg-blue-600 hover:bg-blue-700">
+                                                            {stageInfo.funnelNumber
+                                                                ? `${stageInfo.stageName} - F${stageInfo.funnelNumber}`
+                                                                : `Etapa ${stageInfo.stageNumber}: ${stageInfo.stageName}`
+                                                            }
+                                                        </Badge>
+                                                    )
+                                                })()}
                                                 {userRole === 'ADMIN' && (
                                                     <Badge variant="secondary" className="text-xs font-normal">
                                                         {task.assignedRole}
@@ -221,6 +261,20 @@ export function DeliveriesList({ tasks, userRole }: { tasks: TaskWithProject[], 
                                                 Abrir Briefing
                                             </a>
                                         )}
+                                        {task.title === "Anexar Link do FAQ do Cliente" && !task.isCompleted && (
+                                            <a
+                                                href={`/projects/${task.projectId}`}
+                                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded transition-colors mt-2"
+                                            >
+                                                <ExternalLink className="h-3 w-3" />
+                                                Ir para o Projeto
+                                            </a>
+                                        )}
+                                        {task.title === "Agendar Apresentação de Esboços" && !task.isCompleted && (
+                                            <div className="mt-2">
+                                                <ScheduleMeetingDialog taskId={task.id} />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -235,5 +289,80 @@ export function DeliveriesList({ tasks, userRole }: { tasks: TaskWithProject[], 
                 </div>
             )}
         </div>
+    )
+}
+
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon, Loader2 } from "lucide-react"
+import { scheduleProjectMeeting } from "@/app/(main)/project/actions"
+import { toast } from "sonner"
+
+function ScheduleMeetingDialog({ taskId }: { taskId: string }) {
+    const [date, setDate] = useState<Date>()
+    const [open, setOpen] = useState(false)
+    const [isPending, startTransition] = useTransition()
+
+    const handleSchedule = () => {
+        if (!date) return
+        startTransition(async () => {
+            const result = await scheduleProjectMeeting(taskId, date)
+            if (result?.error) {
+                toast.error(result.error)
+            } else {
+                toast.success("Reunião agendada e cronograma gerado!")
+                setOpen(false)
+            }
+        })
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    Agendar Reunião
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Agendar Apresentação</DialogTitle>
+                    <DialogDescription>
+                        Selecione a data da reunião. Isso irá gerar o cronograma do projeto.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !date && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar
+                                mode="single"
+                                selected={date}
+                                onSelect={setDate}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleSchedule} disabled={!date || isPending}>
+                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Confirmar Agendamento
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     )
 }

@@ -26,6 +26,7 @@ import { RoleProvider } from "@/contexts/role-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { getSession } from "@/lib/auth"
 import { Role } from "@prisma/client"
+import { Toaster } from "@/components/ui/sonner"
 
 export default async function RootLayout({
   children,
@@ -50,6 +51,7 @@ export default async function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <Toaster />
           </ThemeProvider>
         </RoleProvider>
       </body>

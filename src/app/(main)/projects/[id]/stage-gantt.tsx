@@ -10,6 +10,8 @@ interface ProjectStage {
     stageNumber: number
     funnelNumber: number | null
     isCompleted: boolean
+    startDate: Date | null
+    endDate: Date | null
 }
 
 interface StageGanttProps {
@@ -85,15 +87,13 @@ export function StageGantt({ stages, projectStartDate, funnelCount }: StageGantt
         )
     }
 
-    // Calcular datas de início e fim de cada etapa
+    // Build timeline from stored dates
     const stageTimeline: Array<{
         stage: ProjectStage
         name: string
         startDate: Date
         endDate: Date
     }> = []
-
-    let currentDate = new Date(projectStartDate)
 
     // Agrupar stages por número
     const stagesByNumber = stages.reduce((acc, stage) => {
@@ -103,36 +103,32 @@ export function StageGantt({ stages, projectStartDate, funnelCount }: StageGantt
     }, {} as Record<number, ProjectStage[]>)
 
     for (let stageNum = 1; stageNum <= 7; stageNum++) {
+        if (stageNum === 1) continue; // Skip Stage 1
+
         const stageItems = stagesByNumber[stageNum] || []
 
         if (stageNum === 4) {
             // Etapa 4: uma linha por funil
             stageItems.sort((a, b) => (a.funnelNumber || 0) - (b.funnelNumber || 0))
             stageItems.forEach((stage) => {
-                const duration = STAGE_DURATIONS[4]
-                const endDate = addDays(currentDate, duration)
-                stageTimeline.push({
-                    stage,
-                    name: `Funil ${stage.funnelNumber}`,
-                    startDate: new Date(currentDate),
-                    endDate
-                })
-                currentDate = addDays(endDate, 0) // Funis em paralelo, então não avança
+                if (stage.startDate && stage.endDate) {
+                    stageTimeline.push({
+                        stage,
+                        name: `Funil ${stage.funnelNumber}`,
+                        startDate: new Date(stage.startDate),
+                        endDate: new Date(stage.endDate)
+                    })
+                }
             })
-            // Após todos os funis, avançar a data
-            currentDate = addDays(currentDate, STAGE_DURATIONS[4] * funnelCount)
         } else {
             // Outras etapas: uma linha única
-            if (stageItems.length > 0) {
-                const duration = STAGE_DURATIONS[stageNum as keyof typeof STAGE_DURATIONS]
-                const endDate = addDays(currentDate, duration)
+            if (stageItems.length > 0 && stageItems[0].startDate && stageItems[0].endDate) {
                 stageTimeline.push({
                     stage: stageItems[0],
                     name: STAGE_NAMES[stageNum],
-                    startDate: new Date(currentDate),
-                    endDate
+                    startDate: new Date(stageItems[0].startDate),
+                    endDate: new Date(stageItems[0].endDate)
                 })
-                currentDate = addDays(endDate, 0)
             }
         }
     }

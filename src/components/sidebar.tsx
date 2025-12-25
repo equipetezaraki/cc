@@ -1,8 +1,8 @@
 'use client'
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { BarChart3, KanbanSquare, LayoutDashboard, PlusCircle, Settings, Archive, Users, LogOut, ClipboardList } from "lucide-react"
+import { BarChart3, KanbanSquare, LayoutDashboard, PlusCircle, Settings, Archive, Users, LogOut, ClipboardList, Layers, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRole } from "@/contexts/role-context"
@@ -10,25 +10,42 @@ import { logoutAction } from "@/app/login/actions"
 
 const sidebarItems = [
     {
+        title: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+        variant: "default",
+        roles: ['CLIENT']
+    },
+    {
         title: "Farol (Reunião)",
         href: "/meeting",
         icon: BarChart3,
-        variant: "default"
+        variant: "default",
+        roles: ['ADMIN', 'CLOSER', 'CRM', 'IA', 'PRODUCT_OWNER']
     },
     {
         title: "Kanban de Projetos",
         href: "/kanban",
         icon: KanbanSquare,
-        variant: "ghost"
+        variant: "ghost",
+        roles: ['ADMIN', 'CLOSER', 'CRM', 'IA', 'PRODUCT_OWNER']
     },
     {
         title: "Minhas Tarefas",
         href: "/deliveries",
         icon: ClipboardList,
-        variant: "ghost"
+        variant: "ghost",
+        roles: ['ADMIN', 'CLOSER', 'CRM', 'IA', 'PRODUCT_OWNER']
     },
     {
-        title: "Novo Projeto",
+        title: "Clientes",
+        href: "/clients",
+        icon: Users,
+        variant: "ghost",
+        roles: ['ADMIN']
+    },
+    {
+        title: "Novo Briefing",
         href: "/onboarding",
         icon: PlusCircle,
         variant: "ghost",
@@ -38,7 +55,29 @@ const sidebarItems = [
         title: "Encerrados",
         href: "/archive",
         icon: Archive,
-        variant: "ghost"
+        variant: "ghost",
+        roles: ['ADMIN', 'CLOSER', 'CRM', 'IA', 'PRODUCT_OWNER']
+    },
+    {
+        title: "Fluxograma",
+        href: "/client/flowchart",
+        icon: Users,
+        variant: "ghost",
+        roles: ['CLIENT']
+    },
+    {
+        title: "Feedbacks",
+        href: "/client/feedbacks",
+        icon: MessageSquare,
+        variant: "ghost",
+        roles: ['CLIENT']
+    },
+    {
+        title: "Feedbacks IA",
+        href: "/feedbacks",
+        icon: MessageSquare,
+        variant: "ghost",
+        roles: ['ADMIN', 'CRM', 'IA', 'PRODUCT_OWNER']
     }
 ]
 
@@ -52,7 +91,7 @@ export function Sidebar() {
     const { role } = useRole()
 
     return (
-        <div className="pb-12 min-h-screen w-64 border-r bg-background hidden md:block fixed left-0 top-0 bottom-0 z-10">
+        <div className="pb-12 min-h-screen w-64 border-r bg-background hidden md:block fixed left-0 top-0 bottom-0 z-50">
             <div className="flex flex-col h-full">
                 <div className="space-y-4 py-4 flex-1">
                     <div className="px-3 py-2">
@@ -79,18 +118,19 @@ export function Sidebar() {
                                 if (item.roles && !item.roles.includes(role)) {
                                     return null
                                 }
+                                const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/')
                                 return (
-                                    <Link key={item.href} href={item.href}>
-                                        <Button
-                                            variant={pathname === item.href || pathname.startsWith(item.href) && item.href !== '/' ? "secondary" : "ghost"}
-                                            className={cn(
-                                                "w-full justify-start",
-                                                (pathname === item.href || pathname.startsWith(item.href) && item.href !== '/') && "bg-accent font-medium"
-                                            )}
-                                        >
-                                            <item.icon className="mr-2 h-4 w-4" />
-                                            {item.title}
-                                        </Button>
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={cn(
+                                            buttonVariants({ variant: isActive ? "secondary" : "ghost" }),
+                                            "w-full justify-start",
+                                            isActive && "bg-accent font-medium"
+                                        )}
+                                    >
+                                        <item.icon className="mr-2 h-4 w-4" />
+                                        {item.title}
                                     </Link>
                                 )
                             })}
@@ -106,17 +146,29 @@ export function Sidebar() {
                                 <ModeToggle />
                             </div>
                             {role === 'ADMIN' && (
-                                <Link href="/members">
-                                    <Button
-                                        variant={pathname === '/members' ? "secondary" : "ghost"}
-                                        className={cn(
-                                            "w-full justify-start",
-                                            pathname === '/members' && "bg-accent font-medium"
-                                        )}
-                                    >
-                                        <Users className="mr-2 h-4 w-4" />
-                                        Membros
-                                    </Button>
+                                <Link
+                                    href="/members"
+                                    className={cn(
+                                        buttonVariants({ variant: pathname === '/members' ? "secondary" : "ghost" }),
+                                        "w-full justify-start",
+                                        pathname === '/members' && "bg-accent font-medium"
+                                    )}
+                                >
+                                    <Users className="mr-2 h-4 w-4" />
+                                    Membros
+                                </Link>
+                            )}
+                            {role === 'ADMIN' && (
+                                <Link
+                                    href="/admin/templates"
+                                    className={cn(
+                                        buttonVariants({ variant: pathname === '/admin/templates' ? "secondary" : "ghost" }),
+                                        "w-full justify-start",
+                                        pathname === '/admin/templates' && "bg-accent font-medium"
+                                    )}
+                                >
+                                    <Layers className="mr-2 h-4 w-4" />
+                                    Modelos
                                 </Link>
                             )}
                             <Button variant="ghost" className="w-full justify-start">
