@@ -87,7 +87,7 @@ model Project {
   name                   String
   startDate              DateTime
   funnelCount            Int               @default(1)
-  status                 String            @default("ONBOARDING")
+  status                 String            @default("ACTIVE")
   currentStep            Int               @default(1)
   requirementsLink       String?
   credentialsLink        String?
@@ -112,6 +112,7 @@ model Project {
   activeConversations ActiveConversation[]
   messageHistory      MessageHistory[]
   aiInsights          AiInsight[]
+  contracts           ProjectContract[]
 }
 
 model ActiveConversation {
@@ -250,4 +251,30 @@ model Feedback {
 enum FeedbackStatus {
   PENDING
   COMPLETED
+}
+
+model ProjectContract {
+  id               String                @id @default(uuid())
+  projectId        String
+  signatureDate    DateTime
+  paymentStartDate DateTime
+  durationMonths   Int
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  project          Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  installments     ContractInstallment[]
+
+  @@map("project_contracts")
+}
+
+model ContractInstallment {
+  id                  String          @id @default(uuid())
+  contractId          String
+  monthIndex          Int
+  implementationValue Float           @default(0)
+  monthlyFeeValue     Float           @default(0)
+  contract            ProjectContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@map("contract_installments")
 }

@@ -45,6 +45,13 @@ const sidebarItems = [
         roles: ['ADMIN']
     },
     {
+        title: "Financeiro",
+        href: "/admin/financial",
+        icon: BarChart3,
+        variant: "ghost",
+        roles: ['ADMIN']
+    },
+    {
         title: "Novo Briefing",
         href: "/onboarding",
         icon: PlusCircle,
