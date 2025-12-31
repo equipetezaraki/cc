@@ -17,6 +17,8 @@ model Client {
   role          String    @default("CLIENT")
   code          Int       @default(autoincrement())
   driveFolderId String?
+  segment       String?
+  operationSize String?
   createdAt     DateTime  @default(now())
   projects      Project[]
   feedbacks     Feedback[]
@@ -97,12 +99,22 @@ model Project {
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   briefing               Briefing?
+  projectType            String? // "CORRENTE" | "PREMIUM"
+  salesRepId             String?
+  goLiveDate             DateTime?
+  technicalBriefingUrl   String?
   openAiKey              String?
   openRouterKey          String?
   faqConfirmed           Boolean           @default(false)
   speakingStyleConfirmed Boolean           @default(false)
   googleSheetUrl         String?
   meetingDate            DateTime?
+
+  // Configurações do Dashboard / IA
+  businessHoursStart     Int               @default(9) // Horário de início (0-23)
+  businessHoursEnd       Int               @default(18) // Horário de fim (0-23)
+  aiDelay                Int               @default(0) // Delay em segundos
+
   client                 Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   timelines              ProjectTimeline[]
   tasks                  Task[]
@@ -130,7 +142,10 @@ model ActiveConversation {
   crmAccountId BigInt? @map("crm_account_id")
 
   leadName    String? @map("lead_name")
-  funnelStage String? @default("Novo") @map("funnel_stage")
+  
+  // Refactored Funnel/Stage
+  funnel      String  @default("Padrão") @map("funnel_name")
+  stage       String? @default("Novo") @map("funnel_stage") // Mapped to old column name to keep data
 
   dtUltimaMensagem DateTime? @map("dt_ultima_mensagem")
   msgAnterior      String?   @map("msg_anterior")
@@ -144,7 +159,8 @@ model ActiveConversation {
 
   @@index([projectId])
   @@index([sessionId])
-  @@index([funnelStage])
+  @@index([funnel])
+  @@index([stage])
   @@map("active_conversations")
 }
 

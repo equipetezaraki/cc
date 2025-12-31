@@ -79,14 +79,23 @@ export function OnboardingForm() {
             phone: "",
             projectName: "",
             funnelCount: 1,
+            segment: "",
+            operationSize: "Pequena",
+            projectType: "Corrente",
+            technicalBriefingUrl: "",
         },
     })
 
-    // Technical Briefing State
-    const [companyContext, setCompanyContext] = useState("")
-    const [projectType, setProjectType] = useState("ia_closer_checkout")
-    const [projectContext, setProjectContext] = useState("")
-    const [systems, setSystems] = useState<SystemRow[]>([{ application: "", usage: "" }])
+    // Watch project type to update Go-Live Date
+    const projectType = form.watch("projectType")
+
+    // Calculate Go-Live Date
+    const goLiveDate = useMemo(() => {
+        const days = projectType === 'Premium' ? 60 : 30
+        const date = new Date()
+        date.setDate(date.getDate() + days)
+        return format(date, 'dd/MM/yyyy')
+    }, [projectType])
 
     // Flowchart State
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
@@ -292,21 +301,7 @@ export function OnboardingForm() {
         )
     }
 
-    // --- Systems Helpers ---
-    const addSystemRow = () => {
-        setSystems([...systems, { application: "", usage: "" }])
-    }
 
-    const removeSystemRow = (index: number) => {
-        const newSystems = systems.filter((_, i) => i !== index)
-        setSystems(newSystems)
-    }
-
-    const updateSystemRow = (index: number, field: keyof SystemRow, value: string) => {
-        const newSystems = [...systems]
-        newSystems[index][field] = value
-        setSystems(newSystems)
-    }
 
     function onSubmit(data: OnboardingFormValues) {
         startTransition(async () => {
@@ -324,10 +319,6 @@ export function OnboardingForm() {
 
             const fullData = {
                 ...data,
-                companyContext,
-                projectType,
-                projectContext,
-                systems,
                 flowchartData: {
                     nodes: sanitizedNodes,
                     edges
@@ -411,9 +402,9 @@ export function OnboardingForm() {
                         />
                     </div>
 
-                    {/* Project Info */}
+                    {/* Strategic & Project Info */}
                     <div className="space-y-4">
-                        <h3 className="text-lg font-medium">Dados do Projeto</h3>
+                        <h3 className="text-lg font-medium">Classificação e Projeto</h3>
 
                         <FormField
                             control={form.control}
@@ -445,6 +436,129 @@ export function OnboardingForm() {
                                 </FormItem>
                             )}
                         />
+
+                        <FormField
+                            control={form.control}
+                            name="segment"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Segmento do Negócio</FormLabel>
+                                    <FormControl>
+                                        <select
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                            {...field}
+                                        >
+                                            <option value="">Selecione...</option>
+                                            <option value="Clínica">Clínica</option>
+                                            <option value="E-commerce">E-commerce</option>
+                                            <option value="Serviços">Serviços</option>
+                                            <option value="Imobiliária">Imobiliária</option>
+                                            <option value="Educação">Educação</option>
+                                            <option value="Varejo">Varejo</option>
+                                            <option value="Atacado">Atacado</option>
+                                            <option value="Atacado e Varejo">Atacado e Varejo</option>
+                                            <option value="Indústria">Indústria</option>
+                                        </select>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="operationSize"
+                            render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                    <FormLabel>Tamanho da Operação</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup
+                                            onValueChange={field.onChange}
+                                            defaultValue={field.value}
+                                            className="flex flex-col space-y-1"
+                                        >
+                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                <FormControl>
+                                                    <RadioGroupItem value="Pequena" />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">
+                                                    Pequena (R$ 100k/mês &lt; x &lt; R$ 500k/mês)
+                                                </FormLabel>
+                                            </FormItem>
+                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                <FormControl>
+                                                    <RadioGroupItem value="Média" />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">
+                                                    Média (R$ 500k/mês &lt; x &lt; R$ 1MM/mês)
+                                                </FormLabel>
+                                            </FormItem>
+                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                <FormControl>
+                                                    <RadioGroupItem value="Grande" />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">
+                                                    Grande (R$ 1MM/mês+)
+                                                </FormLabel>
+                                            </FormItem>
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="projectType"
+                            render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                    <FormLabel>Tipo de Projeto</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup
+                                            onValueChange={field.onChange}
+                                            defaultValue={field.value}
+                                            className="flex flex-col space-y-1"
+                                        >
+                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                <FormControl>
+                                                    <RadioGroupItem value="Corrente" />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">
+                                                    Corrente (≤ R$ 2.000 / mês)
+                                                </FormLabel>
+                                            </FormItem>
+                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                <FormControl>
+                                                    <RadioGroupItem value="Premium" />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">
+                                                    Premium (≥ R$ 4.000 / mês)
+                                                </FormLabel>
+                                            </FormItem>
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                </div>
+
+                {/* Responsáveis e Datas */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t">
+                    <div className="space-y-2">
+                        <Label>Comercial Responsável</Label>
+                        <Input value="Eu (Auto)" disabled />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Data de Fechamento</Label>
+                        <Input value={format(new Date(), 'dd/MM/yyyy')} disabled />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Data Prevista de Go-Live</Label>
+                        <Input value={goLiveDate} disabled />
+                        <p className="text-xs text-muted-foreground">{projectType === 'Premium' ? '+60 dias' : '+30 dias'}</p>
                     </div>
                 </div>
 
@@ -455,79 +569,25 @@ export function OnboardingForm() {
                     {/* 1. Contexto Geral */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>1. Contexto Geral</CardTitle>
+                            <CardTitle>Link do Documento de Briefing</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="space-y-2">
-                                <Label>Contexto da Empresa</Label>
-                                <Textarea
-                                    placeholder="Descreva o negócio do cliente, público-alvo, dores, etc."
-                                    value={companyContext}
-                                    onChange={(e) => setCompanyContext(e.target.value)}
-                                    className="min-h-[100px]"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Tipo de Entrega</Label>
-                                <RadioGroup value={projectType} onValueChange={setProjectType} className="flex flex-col space-y-1">
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="ia_closer_checkout" id="r1" />
-                                        <Label htmlFor="r1">IA Closer + Checkout Digital</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="ia_crm" id="r2" />
-                                        <Label htmlFor="r2">IA + CRM</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="crm" id="r3" />
-                                        <Label htmlFor="r3">Apenas CRM</Label>
-                                    </div>
-                                </RadioGroup>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Detalhes do Projeto</Label>
-                                <Textarea
-                                    placeholder="Descreva o que será entregue com mais detalhes..."
-                                    value={projectContext}
-                                    onChange={(e) => setProjectContext(e.target.value)}
-                                    className="min-h-[100px]"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* 2. Sistemas Utilizados */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>2. Sistemas Utilizados</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {systems.map((row, index) => (
-                                <div key={index} className="flex gap-4 items-start">
-                                    <div className="flex-1">
-                                        <Input
-                                            placeholder="Aplicação (Ex: RD Station)"
-                                            value={row.application}
-                                            onChange={(e) => updateSystemRow(index, 'application', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex-1">
-                                        <Input
-                                            placeholder="Para que é usada (Ex: Captura de Leads)"
-                                            value={row.usage}
-                                            onChange={(e) => updateSystemRow(index, 'usage', e.target.value)}
-                                        />
-                                    </div>
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeSystemRow(index)} disabled={systems.length === 1}>
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                </div>
-                            ))}
-                            <Button type="button" variant="outline" onClick={addSystemRow} className="gap-2">
-                                <Plus className="h-4 w-4" /> Adicionar Sistema
-                            </Button>
+                            <FormField
+                                control={form.control}
+                                name="technicalBriefingUrl"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Link do Google Docs</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="https://docs.google.com/document/d/..." {...field} />
+                                        </FormControl>
+                                        <FormDescription>
+                                            Anexe o link do documento de briefing técnico preenchido.
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </CardContent>
                     </Card>
 
@@ -612,7 +672,7 @@ export function OnboardingForm() {
                     {isPending ? "Criando Projeto..." : "Iniciar Projeto"}
                 </Button>
             </form>
-        </Form>
+        </Form >
     )
 }
 

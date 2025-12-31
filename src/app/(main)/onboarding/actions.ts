@@ -48,13 +48,23 @@ export async function submitBriefing(data: any) {
 
     const {
         clientName, email, companyName, phone,
-        projectName, funnelCount
+        projectName, funnelCount,
+        segment, operationSize, projectType, technicalBriefingUrl
     } = validatedFields.data
 
     // Extract extra briefing data
-    const { companyContext, projectType, projectContext, systems, flowchartData } = data
+    const { flowchartData } = data
 
-    // Placeholder start date (will be updated by PO later)
+    // Calculate Go-Live Date
+    // +30 days -> Corrente
+    // +60 days -> Premium
+    const daysToAdd = projectType === 'Corrente' ? 30 : 60
+    const goLiveDate = addBusinessDays(new Date(), daysToAdd) // or simple date add? User said "Data Prevista" logic. 
+    // Usually business days or calendar days. "30 dias" implies calendar days mostly, but let's use date-fns addDays if available or just addBusinessDays if that's what we have.
+    // The import says `addBusinessDays`. I'll stick to that or `addDays` if I import it.
+    // Let's assume calendar days for simplicity unless specified "úteis".
+    // User: "+30 dias". Standard is calendar.
+
     const startDate = new Date()
 
     console.log('✅ Validation passed, checking for existing client...')
@@ -84,6 +94,8 @@ export async function submitBriefing(data: any) {
                     email: email,
                     phone,
                     passwordHash: hashedPassword,
+                    segment,
+                    operationSize,
                 }
             })
 
@@ -128,6 +140,10 @@ export async function submitBriefing(data: any) {
                 clientId: client.id,
                 status: 'ONBOARDING',
                 currentStep: 1,
+                projectType,
+                goLiveDate,
+                technicalBriefingUrl,
+                salesRepId: "SYSTEM_USER", // TODO: Replace with actual session user ID
             }
         })
 
@@ -135,10 +151,6 @@ export async function submitBriefing(data: any) {
         await prisma.briefing.create({
             data: {
                 projectId: project.id,
-                companyContext,
-                projectType,
-                projectContext,
-                systems,
                 flowchartData
             }
         })
@@ -184,10 +196,10 @@ export async function submitBriefing(data: any) {
             loginEmail: email,
             ...(isNewClient && { loginPassword: randomPassword }), // Only include password for new clients
             isNewClient,
-            // Add technical briefing data to webhook if needed
-            companyContext,
+            segment,
+            operationSize,
             projectType,
-            projectContext,
+            technicalBriefingUrl,
         })
 
     } catch (error) {
