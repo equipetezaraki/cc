@@ -223,7 +223,7 @@ model StageTemplate {
   stageNumber Int            @unique
   kanbanColumn String?       // e.g., "onboarding", "step-2", "done"
   durationDays Int           @default(0)
-  trigger      String?       // Description of what triggers this stage or previous requirement
+  isPerFunnel  Boolean       @default(false)
   tasks       TaskTemplate[]
 
   createdAt DateTime @default(now())
@@ -237,7 +237,7 @@ model TaskTemplate {
   title       String
   description String?
   durationDays Int     @default(0)
-  trigger      String?
+  order        Int     @default(0)
 
   stageTemplateId String        @map("stage_template_id")
   stageTemplate   StageTemplate @relation(fields: [stageTemplateId], references: [id], onDelete: Cascade)
@@ -293,4 +293,23 @@ model ContractInstallment {
   contract            ProjectContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
   @@map("contract_installments")
+}
+
+enum ExpenseType {
+  RECURRING
+  ONE_TIME
+}
+
+model Expense {
+  id          String      @id @default(uuid())
+  description String
+  amount      Float
+  type        ExpenseType
+  category    String?
+  date        DateTime
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("expenses")
 }

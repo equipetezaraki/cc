@@ -26,10 +26,11 @@ function isHoliday(date: Date): boolean {
 
 export function calculateBusinessDate(startDate: Date, daysToAdd: number): Date {
     let currentDate = new Date(startDate);
+    const absDays = Math.abs(daysToAdd);
     let addedDays = 0;
 
-    while (addedDays < daysToAdd) {
-        currentDate = addDays(currentDate, 1);
+    while (addedDays < absDays) {
+        currentDate = addDays(currentDate, daysToAdd > 0 ? 1 : -1);
 
         if (!isWeekend(currentDate) && !isHoliday(currentDate)) {
             addedDays++;

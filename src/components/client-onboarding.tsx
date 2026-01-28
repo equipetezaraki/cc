@@ -24,9 +24,7 @@ import { toast } from "sonner"
 const clientOnboardingSchema = z.object({
     openAiKey: z.string().min(1, "API Key da OpenAI é obrigatória"),
     openRouterKey: z.string().min(1, "API Key da OpenRouter é obrigatória"),
-    faqConfirmed: z.boolean().refine(val => val === true, "Você deve confirmar o preenchimento do FAQ e o acordo com o desenvolvimento"),
 })
-
 type ClientOnboardingValues = z.infer<typeof clientOnboardingSchema>
 
 interface ClientOnboardingProps {
@@ -50,7 +48,6 @@ export function ClientOnboarding({ projectId, faqLink, initialData, hasPendingOn
         defaultValues: {
             openAiKey: initialData?.openAiKey || "",
             openRouterKey: initialData?.openRouterKey || "",
-            faqConfirmed: initialData?.faqConfirmed || false,
         },
     })
 
@@ -60,9 +57,7 @@ export function ClientOnboarding({ projectId, faqLink, initialData, hasPendingOn
             const result = await saveClientOnboardingData(projectId, {
                 openAiKey: values.openAiKey,
                 openRouterKey: values.openRouterKey,
-                faqConfirmed: values.faqConfirmed,
             })
-
             if (result?.error) {
                 toast.error(result.error)
             } else {
@@ -73,7 +68,10 @@ export function ClientOnboarding({ projectId, faqLink, initialData, hasPendingOn
 
     const onSubmit = (data: ClientOnboardingValues) => {
         startTransition(async () => {
-            const result = await submitClientOnboarding(projectId, data)
+            const result = await submitClientOnboarding(projectId, {
+                ...data,
+                faqConfirmed: true // Automatically confirm on submission
+            })
             if (result?.error) {
                 toast.error(result.error)
             } else {
@@ -98,7 +96,17 @@ export function ClientOnboarding({ projectId, faqLink, initialData, hasPendingOn
                             Recebemos suas informações com sucesso. Nossa equipe já foi notificada e entrará em contato em breve para agendar a apresentação dos esboços.
                         </CardDescription>
                     </div>
-                    <div className="pt-4">
+                    <div className="pt-4 flex flex-col items-center gap-4">
+                        {faqLink && (
+                            <a
+                                href={faqLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline inline-flex items-center text-sm font-medium"
+                            >
+                                Acessar FAQ do Projeto <ExternalLink className="ml-1 h-4 w-4" />
+                            </a>
+                        )}
                         <Button variant="outline" disabled>
                             Aguardando Agendamento
                         </Button>
@@ -119,6 +127,34 @@ export function ClientOnboarding({ projectId, faqLink, initialData, hasPendingOn
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+
+                        {/* FAQ Link from Product Owner - Moved to Top */}
+                        {!!faqLink && (
+                            <div className="p-6 border-2 border-primary/20 rounded-xl bg-primary/5 space-y-4 mb-8 animate-in fade-in slide-in-from-top-4 duration-500 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <ExternalLink className="h-24 w-24 -mr-8 -mt-8 rotate-12" />
+                                </div>
+                                <div className="flex items-start space-x-4 relative z-10">
+                                    <div className="mt-1 bg-primary/10 p-2 rounded-lg">
+                                        <ExternalLink className="h-6 w-6 text-primary" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="text-lg font-bold text-primary">FAQ do Seu Projeto</h4>
+                                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                                            Preparamos um FAQ personalizado com todas as diretrizes, prazos e informações essenciais para o sucesso da sua IA.
+                                        </p>
+                                        <a
+                                            href={faqLink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-105 hover:bg-primary/90 active:scale-95"
+                                        >
+                                            Abrir FAQ Agora <ExternalLink className="ml-2 h-4 w-4" />
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-4">
                             <FormField
@@ -156,94 +192,6 @@ export function ClientOnboarding({ projectId, faqLink, initialData, hasPendingOn
                             />
                         </div>
 
-                        {/* FAQ Link from Product Owner */}
-                        {faqLink && (
-                            <div className="p-4 border rounded-lg bg-primary/5 space-y-2">
-                                <div className="flex items-start space-x-2">
-                                    <div className="mt-1">
-                                        <ExternalLink className="h-5 w-5 text-primary" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-medium">FAQ do Cliente</h4>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            Acesse o FAQ preparado especialmente para você:
-                                        </p>
-                                        <a
-                                            href={faqLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-primary hover:underline inline-flex items-center text-sm font-medium"
-                                        >
-                                            Abrir FAQ <ExternalLink className="ml-1 h-3 w-3" />
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* FAQ Confirmation Checkbox */}
-                        {!faqLink && (
-                            <div className="rounded-md bg-red-50 p-4 mb-6 border border-red-200">
-                                <div className="flex">
-                                    <div className="flex-shrink-0">
-                                        <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
-                                    </div>
-                                    <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-red-800">FAQ Indisponível</h3>
-                                        <div className="mt-2 text-sm text-red-700">
-                                            <p>O link do FAQ ainda não foi disponibilizado. Entre em contato com o suporte para prosseguir.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <FormField
-                            control={form.control}
-                            name="faqConfirmed"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-background">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                            disabled={!faqLink}
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel className={!faqLink ? "text-muted-foreground" : ""}>
-                                            Declaro que preenchi o FAQ e estou de acordo com o desenvolvimento do projeto com as informações atuais
-                                        </FormLabel>
-                                        <FormDescription>
-                                            Confirmo o preenchimento e aceito os termos para início do desenvolvimento.
-                                        </FormDescription>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Speaking Style Confirmation Item */}
-                        <div className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-background mt-6">
-                            <Checkbox
-                                checked={initialData?.speakingStyleConfirmed}
-                                disabled
-                                id="speaking-style"
-                            />
-                            <div className="space-y-1 leading-none">
-                                <label
-                                    htmlFor="speaking-style"
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                    Definição de Estilo de Fala
-                                </label>
-                                <p className="text-sm text-muted-foreground">
-                                    Converse com o TZK no WhatsApp para definir o estilo de fala da sua IA.
-                                    Este item será marcado automaticamente após a conclusão.
-                                    <br />
-                                    <span className="text-xs italic">Em caso de dúvidas, contate o suporte.</span>
-                                </p>
-                            </div>
-                        </div>
 
                         <div className="flex justify-between pt-4">
                             <Button
@@ -256,7 +204,7 @@ export function ClientOnboarding({ projectId, faqLink, initialData, hasPendingOn
                                 Salvar Parcialmente
                             </Button>
 
-                            <Button type="submit" disabled={isPending || !initialData?.speakingStyleConfirmed}>
+                            <Button type="submit" disabled={isPending}>
                                 {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                                 Enviar e Iniciar
                             </Button>

@@ -29,10 +29,9 @@ export async function getClientProject() {
         where: { email: userEmail },
         include: {
             projects: {
-                take: 1,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    stages: true // Include stages if needed
+                    stages: true
                 }
             }
         }
@@ -40,7 +39,13 @@ export async function getClientProject() {
 
     if (!client || client.projects.length === 0) return null
 
-    const project = client.projects[0]
+    // If multiple projects, find the best one to show:
+    // 1. Prefer projects with ANY link (FAQ, Google Sheet or Tech Briefing)
+    // 2. Prefer ACTIVE projects
+    // 3. Fallback to newest one
+    let project = client.projects.find(p => p.faqLink || p.googleSheetUrl || p.technicalBriefingUrl)
+        || client.projects.find(p => p.status === 'ACTIVE')
+        || client.projects[0]
 
     // Check if onboarding task exists
     const onboardingTask = await prisma.task.findFirst({

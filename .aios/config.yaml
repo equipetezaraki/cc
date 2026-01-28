@@ -1,0 +1,28 @@
+# AIOS Project Configuration
+version: 2.1.0
+project:
+  name: gestao-tzk
+  type: existing
+  created: 2025-01-28
+  mode: project-development
+
+environment:
+  bootstrapped: true
+  bootstrap_date: 2025-01-28T00:00:00
+  os: windows
+  node_version: v22.22.0
+  npm_version: 10.9.4
+
+workflow:
+  current: development
+  phase: bootstrap-complete
+
+repository:
+  url: https://github.com/tezaraki/Gestao_TZK.git
+  organization: equipetezaraki
+  auth_status: pending
+
+settings:
+  auto_update_status: true
+  quality_gates_enabled: true
+  mcp_docker: disabled

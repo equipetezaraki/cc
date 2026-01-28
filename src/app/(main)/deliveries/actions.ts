@@ -145,8 +145,9 @@ export async function toggleTaskCompletion(taskId: string, isCompleted: boolean)
         if (!task) return { error: "Task not found" }
 
         // If trying to complete the scheduling task, verify meeting date is set
-        if (isCompleted && task.title === "Agendar Apresentação de Esboços" && !task.project.meetingDate) {
-            return { error: "A data da apresentação deve ser agendada antes de marcar esta tarefa como concluída." }
+        const schedulingTasks = ["Agendar Apresentação de Esboços", "Iniciar onboarding com cliente", "Agendar Onboarding"]
+        if (isCompleted && schedulingTasks.includes(task.title) && !task.project.meetingDate) {
+            return { error: "A data da apresentação/reunião deve ser agendada antes de marcar esta tarefa como concluída." }
         }
 
         // Update the task
@@ -217,8 +218,7 @@ export async function toggleTaskCompletion(taskId: string, isCompleted: boolean)
                     await prisma.project.update({
                         where: { id: task.projectId },
                         data: {
-                            currentStep: currentStep + 1,
-                            status: currentStep + 1 > 7 ? 'DONE' : 'ACTIVE'
+                            currentStep: currentStep + 1
                         }
                     })
                     revalidatePath('/kanban')

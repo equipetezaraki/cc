@@ -123,34 +123,32 @@ export async function updateStageDate(stageId: string, endDate: Date, projectId:
         // Find the index of the updated stage
         const updatedIndex = allStages.findIndex(s => s.id === stageId)
 
+        // Fetch templates for dynamic durations
+        const templates = await prisma.stageTemplate.findMany()
+        const templateMap = templates.reduce((acc, t) => {
+            acc[t.stageNumber] = t
+            return acc
+        }, {} as Record<number, typeof templates[0]>)
+
         // Process all stages after the updated one
         for (let i = updatedIndex + 1; i < allStages.length; i++) {
             const stage = allStages[i]
+            const template = templateMap[stage.stageNumber]
+            if (!template) continue
+
             const newStartDate = currentEndDate
+            let duration = template.durationDays
 
+            // If it's maturação (usually stage 6), it's often calendar days
             let newEndDate: Date
-
-            // Apply duration rules based on stage number
-            if (stage.stageNumber === 1) {
-                newEndDate = calculateBusinessDate(newStartDate, 2)
-            } else if (stage.stageNumber === 2) {
-                newEndDate = calculateBusinessDate(newStartDate, 3)
-            } else if (stage.stageNumber === 3) {
-                newEndDate = calculateBusinessDate(newStartDate, 3)
-            } else if (stage.stageNumber === 4) {
-                // Each funnel is 3 business days
-                newEndDate = calculateBusinessDate(newStartDate, 3)
-            } else if (stage.stageNumber === 5) {
-                newEndDate = calculateBusinessDate(newStartDate, 1)
-            } else if (stage.stageNumber === 6) {
-                // 30 calendar days
+            if (template.stageNumber === 6) {
                 newEndDate = new Date(newStartDate)
                 newEndDate.setDate(newEndDate.getDate() + 30)
-            } else if (stage.stageNumber === 7) {
-                // Milestone - same as previous
-                newEndDate = currentEndDate
             } else {
-                newEndDate = newStartDate
+                if ((template as any).isPerFunnel) {
+                    duration = duration * project.funnelCount
+                }
+                newEndDate = calculateBusinessDate(newStartDate, duration)
             }
 
             stagesToUpdate.push({

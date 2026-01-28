@@ -26,40 +26,63 @@ export type KanbanProject = {
     }[]
 }
 
-export async function getProjects(): Promise<KanbanProject[]> {
-    const projects = await prisma.project.findMany({
-        where: {
-            status: {
-                not: 'ARCHIVED'
-            }
-        },
-        include: {
-            client: {
-                select: { name: true }
+export type StageTemplate = {
+    id: string
+    name: string
+    stageNumber: number
+    kanbanColumn: string | null
+}
+
+export type KanbanData = {
+    projects: KanbanProject[]
+    templates: StageTemplate[]
+}
+
+export async function getProjects(): Promise<KanbanData> {
+    const [projects, templates] = await Promise.all([
+        prisma.project.findMany({
+            where: {
+                status: {
+                    not: 'ARCHIVED'
+                }
             },
-            stages: {
-                select: {
-                    stageNumber: true,
-                    funnelNumber: true,
-                    endDate: true
+            include: {
+                client: {
+                    select: { name: true }
                 },
-                orderBy: [
-                    { stageNumber: 'asc' },
-                    { funnelNumber: 'asc' }
-                ]
-            },
-            tasks: {
-                select: {
-                    plannedEnd: true,
-                    stageRef: true,
-                    isCompleted: true
+                stages: {
+                    select: {
+                        stageNumber: true,
+                        funnelNumber: true,
+                        endDate: true
+                    },
+                    orderBy: [
+                        { stageNumber: 'asc' },
+                        { funnelNumber: 'asc' }
+                    ]
+                },
+                tasks: {
+                    select: {
+                        plannedEnd: true,
+                        stageRef: true,
+                        isCompleted: true
+                    }
                 }
             }
-        }
-    })
+        }),
+        prisma.stageTemplate.findMany({
+            orderBy: { stageNumber: 'asc' },
+            select: {
+                id: true,
+                name: true,
+                stageNumber: true,
+                kanbanColumn: true
+            }
+        })
+    ])
 
     // Serialize dates to ISO strings for client-side hydration
-    return projects.map(project => ({
+    const serializedProjects = projects.map(project => ({
         ...project,
         startDate: project.startDate.toISOString(),
         meetingDate: project.meetingDate ? project.meetingDate.toISOString() : null,
@@ -72,6 +95,11 @@ export async function getProjects(): Promise<KanbanProject[]> {
             plannedEnd: task.plannedEnd.toISOString()
         }))
     }))
+
+    return {
+        projects: serializedProjects,
+        templates: templates as any
+    }
 }
 
 export async function updateProjectStatus(projectId: string, newStatus: string, newStep: number) {
@@ -102,23 +130,23 @@ export async function updateProjectStatus(projectId: string, newStatus: string, 
             return { error: "Projeto não encontrado" }
         }
 
-        // Only validate if moving forward (not backwards to onboarding)
+        // Only validate if moving forward (ignoring moves within same column/step)
         if (newStep > project.currentStep) {
-            // Get the stage(s) for the current step
-            const currentStages = project.stages.filter(s => s.stageNumber === project.currentStep)
+            // Get all stages between current and new step (excluding newStep if we want to allow jumping to start of a category)
+            const stagesToCheck = project.stages.filter(s => s.stageNumber >= project.currentStep && s.stageNumber < newStep)
 
-            // Check if there are pending tasks for any of the current stage dates
-            for (const stage of currentStages) {
+            // Check if there are pending tasks for any of these stages
+            for (const stage of stagesToCheck) {
                 if (stage.endDate) {
                     const tasksForStage = project.tasks.filter(task =>
-                        task.plannedEnd.getTime() === stage.endDate!.getTime()
+                        task.plannedEnd?.getTime() === stage.endDate!.getTime()
                     )
 
                     const pendingTasks = tasksForStage.filter(task => !task.isCompleted)
 
                     if (pendingTasks.length > 0) {
                         return {
-                            error: `Não é possível avançar. Existem ${pendingTasks.length} tarefa(s) pendente(s) na etapa atual.`
+                            error: `Não é possível avançar. Existem ${pendingTasks.length} tarefa(s) pendente(s) em etapas anteriores.`
                         }
                     }
                 }

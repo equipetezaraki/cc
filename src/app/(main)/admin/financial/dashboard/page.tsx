@@ -5,7 +5,7 @@ import { ArrowLeft, LayoutDashboard, List } from "lucide-react"
 import Link from "next/link"
 
 export default async function FinancialDashboardPage() {
-    const { items } = await getFinancialForecast()
+    const { items, expenses } = await getFinancialForecast()
 
     return (
         <div className="container mx-auto py-10 space-y-8">
@@ -36,7 +36,7 @@ export default async function FinancialDashboardPage() {
                 </div>
             </div>
 
-            <DashboardContainer initialData={{ items }} />
+            <DashboardContainer initialData={{ items, expenses }} />
         </div>
     )
 }

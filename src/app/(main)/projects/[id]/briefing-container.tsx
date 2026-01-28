@@ -24,8 +24,7 @@ export function BriefingContainer({ projectId, initialData, canEdit }: BriefingC
     if (isEditing) {
         return (
             <BriefingForm
-                projectId={projectId}
-                initialData={initialData}
+                project={{ id: projectId, ...initialData }}
                 onCancel={() => setIsEditing(false)}
                 onSuccess={() => {
                     setIsEditing(false)

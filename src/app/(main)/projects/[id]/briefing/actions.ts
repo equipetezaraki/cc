@@ -7,7 +7,31 @@ import { redirect } from 'next/navigation'
 
 export async function saveBriefing(projectId: string, data: any) {
     try {
-        // Check if briefing exists
+        // 1. Update Client
+        await prisma.client.update({
+            where: { id: data.clientId },
+            data: {
+                name: data.clientName,
+                company: data.companyName,
+                email: data.email,
+                phone: data.phone,
+                segment: data.segment,
+                operationSize: data.operationSize
+            }
+        })
+
+        // 2. Update Project
+        await prisma.project.update({
+            where: { id: projectId },
+            data: {
+                name: data.projectName,
+                funnelCount: data.funnelCount,
+                projectType: data.projectType,
+                technicalBriefingUrl: data.technicalBriefingUrl
+            }
+        })
+
+        // 3. Update or Create Briefing
         const existingBriefing = await prisma.briefing.findUnique({
             where: { projectId }
         })
@@ -16,10 +40,6 @@ export async function saveBriefing(projectId: string, data: any) {
             await prisma.briefing.update({
                 where: { projectId },
                 data: {
-                    companyContext: data.companyContext,
-                    projectType: data.projectType,
-                    projectContext: data.projectContext,
-                    systems: data.systems,
                     flowchartData: data.flowchartData
                 }
             })
@@ -27,10 +47,6 @@ export async function saveBriefing(projectId: string, data: any) {
             await prisma.briefing.create({
                 data: {
                     projectId,
-                    companyContext: data.companyContext,
-                    projectType: data.projectType,
-                    projectContext: data.projectContext,
-                    systems: data.systems,
                     flowchartData: data.flowchartData
                 }
             })

@@ -9,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Filter, X, Search, Calendar, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { type FinancialItem } from "@/app/(main)/admin/financial/actions"
+import { type FinancialItem, type ExpenseItem } from "@/app/(main)/admin/financial/actions"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface DashboardContainerProps {
     initialData: {
         items: FinancialItem[]
+        expenses: ExpenseItem[]
     }
 }
 
@@ -59,7 +60,7 @@ export function DashboardContainer({ initialData }: DashboardContainerProps) {
     }, [initialData.items, statusFilter, clientFilter])
 
     const forecastData = useMemo(() => {
-        const map = new Map<string, ForecastData>()
+        const map = new Map<string, ForecastData & { expenses: number, net: number }>()
         let startPoint: Date
         let count: number
 
@@ -76,7 +77,7 @@ export function DashboardContainer({ initialData }: DashboardContainerProps) {
         for (let i = 0; i < count; i++) {
             const date = new Date(startPoint.getFullYear(), startPoint.getMonth() + i, 1)
             const key = `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
-            map.set(key, { month: key, implementation: 0, monthly: 0 })
+            map.set(key, { month: key, implementation: 0, monthly: 0, expenses: 0, net: 0 })
         }
 
         filteredItems.forEach(item => {
@@ -90,14 +91,35 @@ export function DashboardContainer({ initialData }: DashboardContainerProps) {
             }
         })
 
+        // Add expenses to the map
+        initialData.expenses.forEach(expense => {
+            if (expense.type === 'RECURRING') {
+                // For recurring, add to every month in the map that is after or on the expense date
+                map.forEach((value, key) => {
+                    const [m, y] = key.split('/').map(Number)
+                    const monthDate = new Date(y, m - 1, 1)
+                    const expenseStartDate = new Date(expense.date.getFullYear(), expense.date.getMonth(), 1)
+
+                    if (monthDate >= expenseStartDate) {
+                        value.expenses += expense.amount
+                    }
+                })
+            } else if (map.has(expense.month)) {
+                // For one-time, add only to specific month
+                const existing = map.get(expense.month)!
+                existing.expenses += expense.amount
+            }
+        })
+
+        // Calculate net for each month
+        map.forEach(value => {
+            value.net = (value.implementation + value.monthly) - value.expenses
+        })
+
         return Array.from(map.values())
-    }, [filteredItems, timeMode, selectedYear, startMonth, monthsToShow])
+    }, [filteredItems, initialData.expenses, timeMode, selectedYear, startMonth, monthsToShow])
 
     const summaryData = useMemo(() => {
-        // Summary should ideally follow the current chart view or remain global?
-        // User asked for "filters for different views" so let's use global filtered items for summary
-        // but maybe "upcoming" should follow the startMonth if in rolling mode.
-
         const now = new Date()
         const currentMonthKey = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
 
@@ -108,8 +130,20 @@ export function DashboardContainer({ initialData }: DashboardContainerProps) {
 
         const totalImplementation = filteredItems.reduce((acc, curr) => acc + curr.implementation, 0)
 
-        // Upcoming 90 days from "now" or from "startMonth"? 
-        // Let's stick to "now" for executive summary unless user asks otherwise.
+        // Calculate current month expenses
+        const currentExpenses = initialData.expenses.reduce((acc, expense) => {
+            if (expense.type === 'RECURRING') {
+                const expenseStartDate = new Date(expense.date.getFullYear(), expense.date.getMonth(), 1)
+                const currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1)
+                if (currentMonthDate >= expenseStartDate) {
+                    return acc + expense.amount
+                }
+            } else if (expense.month === currentMonthKey) {
+                return acc + expense.amount
+            }
+            return acc
+        }, 0)
+
         const upcomingRevenue = filteredItems.filter(item => {
             const futureLimit = new Date(now.getFullYear(), now.getMonth() + 3, 1)
             const currentLimit = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -120,9 +154,11 @@ export function DashboardContainer({ initialData }: DashboardContainerProps) {
             totalContracted,
             currentMRR,
             totalImplementation,
-            upcomingRevenue
+            upcomingRevenue,
+            currentExpenses,
+            netMRR: currentMRR - currentExpenses
         }
-    }, [filteredItems])
+    }, [filteredItems, initialData.expenses])
 
     return (
         <div className="space-y-8">

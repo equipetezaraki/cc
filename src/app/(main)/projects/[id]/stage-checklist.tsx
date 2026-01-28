@@ -29,18 +29,21 @@ interface StageChecklistProps {
     userRole: string
 }
 
-const STAGE_NAMES = [
-    "N/A",
-    "1. Onboarding",
-    "2. Validação de Esboços",
-    "3. Setup & Automações",
-    "4. Desenvolvimento de Funis",
-    "5. Go-Live",
-    "6. Maturação",
-    "7. Entrega Final"
-]
+interface StageTemplate {
+    id: string
+    name: string
+    stageNumber: number
+}
 
-export function StageChecklist({ projectId, currentStep, stages, userRole }: StageChecklistProps) {
+interface StageChecklistProps {
+    projectId: string
+    currentStep: number
+    stages: ProjectStage[]
+    userRole: string
+    templates: StageTemplate[]
+}
+
+export function StageChecklist({ projectId, currentStep, stages, userRole, templates }: StageChecklistProps) {
     const [isPending, startTransition] = useTransition()
     const [editingStageId, setEditingStageId] = useState<string | null>(null)
 
@@ -79,12 +82,13 @@ export function StageChecklist({ projectId, currentStep, stages, userRole }: Sta
         return acc
     }, {} as Record<number, ProjectStage[]>)
 
-    // Sort funnels within stage 4
-    if (stagesByNumber[4]) {
-        stagesByNumber[4].sort((a, b) =>
-            (a.funnelNumber || 0) - (b.funnelNumber || 0)
-        )
-    }
+    // Map templates for easier lookup
+    const templateMap = templates.reduce((acc, t) => {
+        acc[t.stageNumber] = t.name
+        return acc
+    }, {} as Record<number, string>)
+
+    const sortedStageNumbers = templates.map(t => t.stageNumber).sort((a, b) => a - b)
 
     return (
         <Card className="h-full flex flex-col">
@@ -97,9 +101,8 @@ export function StageChecklist({ projectId, currentStep, stages, userRole }: Sta
             <CardContent className="flex-1 p-0">
                 <ScrollArea className="px-6 pb-6">
                     <div className="space-y-4">
-                        {STAGE_NAMES.slice(1).map((name, index) => {
-                            const stageNum = index + 1
-
+                        {sortedStageNumbers.map((stageNum) => {
+                            const name = templateMap[stageNum] || `Etapa ${stageNum}`
                             const stageItems = stagesByNumber[stageNum] || []
                             const isCurrent = stageNum === currentStep
                             const isPast = stageNum < currentStep
@@ -120,65 +123,68 @@ export function StageChecklist({ projectId, currentStep, stages, userRole }: Sta
                                         {stageItems.length === 0 && (
                                             <p className="text-xs text-muted-foreground italic">Sem sub-etapas.</p>
                                         )}
-                                        {stageItems.map(stage => (
-                                            <div key={stage.id} className="flex items-start justify-between gap-2">
-                                                <div className="flex items-start gap-2 flex-1">
-                                                    <Checkbox
-                                                        id={`stage-${stageNum}-${stage.id}`}
-                                                        checked={stage.isCompleted}
-                                                        onCheckedChange={(checked) => handleToggle(stage.id, checked as boolean)}
-                                                        disabled={true}
-                                                    />
-                                                    <label
-                                                        htmlFor={`stage-${stageNum}-${stage.id}`}
-                                                        className={cn(
-                                                            "text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer",
-                                                            stage.isCompleted && "line-through text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        {stage.funnelNumber
-                                                            ? `Funil ${stage.funnelNumber}`
-                                                            : name
-                                                        }
-                                                    </label>
-                                                </div>
+                                        {stageItems.map(stage => {
+                                            const subName = stage.funnelNumber
+                                                ? `Funil ${stage.funnelNumber}`
+                                                : name
 
-                                                {/* Date Display/Editor */}
-                                                {stage.endDate && (
-                                                    <div className="flex items-center gap-1">
-                                                        {canEditDates ? (
-                                                            <Popover open={editingStageId === stage.id} onOpenChange={(open) => setEditingStageId(open ? stage.id : null)}>
-                                                                <PopoverTrigger asChild>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                                                        disabled={isPending}
-                                                                    >
-                                                                        <Calendar className="h-3 w-3 mr-1" />
-                                                                        {format(new Date(stage.endDate), "dd/MM/yy", { locale: ptBR })}
-                                                                    </Button>
-                                                                </PopoverTrigger>
-                                                                <PopoverContent className="w-auto p-0" align="end">
-                                                                    <CalendarComponent
-                                                                        mode="single"
-                                                                        selected={new Date(stage.endDate)}
-                                                                        onSelect={(date) => handleDateUpdate(stage.id, date)}
-                                                                        disabled={isPending}
-                                                                        initialFocus
-                                                                    />
-                                                                </PopoverContent>
-                                                            </Popover>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                <Calendar className="h-3 w-3" />
-                                                                {format(new Date(stage.endDate), "dd/MM/yy", { locale: ptBR })}
-                                                            </span>
-                                                        )}
+                                            return (
+                                                <div key={stage.id} className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-start gap-2 flex-1">
+                                                        <Checkbox
+                                                            id={`stage-${stageNum}-${stage.id}`}
+                                                            checked={stage.isCompleted}
+                                                            onCheckedChange={(checked) => handleToggle(stage.id, checked as boolean)}
+                                                            disabled={true}
+                                                        />
+                                                        <label
+                                                            htmlFor={`stage-${stageNum}-${stage.id}`}
+                                                            className={cn(
+                                                                "text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer",
+                                                                stage.isCompleted && "line-through text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {subName}
+                                                        </label>
                                                     </div>
-                                                )}
-                                            </div>
-                                        ))}
+
+                                                    {/* Date Display/Editor */}
+                                                    {(stage.endDate || stage.startDate) && (
+                                                        <div className="flex items-center gap-1">
+                                                            {canEditDates && stage.stageNumber !== 1 ? (
+                                                                <Popover open={editingStageId === stage.id} onOpenChange={(open) => setEditingStageId(open ? stage.id : null)}>
+                                                                    <PopoverTrigger asChild>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                                                            disabled={isPending}
+                                                                        >
+                                                                            <Calendar className="h-3 w-3 mr-1" />
+                                                                            {format(new Date(stage.stageNumber === 1 ? stage.startDate! : stage.endDate!), "dd/MM/yy", { locale: ptBR })}
+                                                                        </Button>
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent className="w-auto p-0" align="end">
+                                                                        <CalendarComponent
+                                                                            mode="single"
+                                                                            selected={new Date(stage.stageNumber === 1 ? stage.startDate! : stage.endDate!)}
+                                                                            onSelect={(date) => handleDateUpdate(stage.id, date)}
+                                                                            disabled={isPending}
+                                                                            initialFocus
+                                                                        />
+                                                                    </PopoverContent>
+                                                                </Popover>
+                                                            ) : (
+                                                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                    <Calendar className="h-3 w-3" />
+                                                                    {format(new Date(stage.stageNumber === 1 ? stage.startDate! : stage.endDate!), "dd/MM/yy", { locale: ptBR })}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             )

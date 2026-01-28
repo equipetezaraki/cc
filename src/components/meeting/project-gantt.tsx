@@ -6,14 +6,18 @@ import { useRef, useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { GanttChartSquare } from "lucide-react"
 
+interface GanttPhase {
+    name: string
+    start: Date
+    end: Date | null
+    color: string
+}
+
 interface GanttProject {
     id: string
     name: string
     clientName: string
-    implementationStart: Date
-    implementationEnd: Date | null
-    maintenanceStart: Date | null
-    maintenanceEnd: Date | null
+    phases: GanttPhase[]
 }
 
 interface ProjectGanttProps {
@@ -51,160 +55,141 @@ export function ProjectGantt({ projects }: ProjectGanttProps) {
         }
     }
 
-    useEffect(() => {
-        if (scrollContainerRef.current) {
-            // Scroll to today broadly (approximate)
-            const today = new Date()
-            const daysDiff = differenceInDays(today, rangeStart)
-            const scrollPos = (daysDiff * minDayWidth) - 300 // Center a bit
-            scrollContainerRef.current.scrollLeft = Math.max(0, scrollPos)
-            scrollContainerRef.current.style.cursor = 'grab'
-        }
-    }, [])
-
-    if (projects.length === 0) {
-        return null
-    }
-
     // Determine timeline range
-    const dates = projects.flatMap(p => [
-        p.implementationStart,
-        p.implementationEnd,
-        p.maintenanceEnd
-    ].filter((d): d is Date => d !== null))
+    const allDates = projects.flatMap(p =>
+        p.phases.flatMap(ph => [ph.start, ph.end].filter((d): d is Date => d instanceof Date || (typeof d === 'string' && !isNaN(Date.parse(d)))))
+    ).map(d => d instanceof Date ? d : new Date(d))
 
-    if (dates.length === 0) return null
+    if (allDates.length === 0) return null
 
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())))
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
+    const minDate = new Date(Math.min(...allDates.map(d => d.getTime())))
+    const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Start a bit before the earliest date or today
-    const rangeStart = startOfWeek(minDate)
-    const rangeEnd = endOfWeek(addDays(maxDate, 14)) // Add buffer
-
+    // Dynamic timeline range: from earliest project date to latest + 5 days
+    const rangeStart = startOfWeek(minDate < today ? minDate : today, { locale: ptBR })
+    const rangeEnd = addDays(maxDate, 5)
     const allDays = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
 
-    const minDayWidth = 40
-    const timelineWidth = allDays.length * minDayWidth
+    const minDayWidth = 30 // Reduced from 40 for compression
+    const sidebarWidth = 260 // Increased to ensure project names are visible
 
-    const getPosition = (start: Date, end: Date) => {
+    useEffect(() => {
+        if (scrollContainerRef.current) {
+            const daysDiff = differenceInDays(today, rangeStart)
+            const scrollPos = (daysDiff * minDayWidth) - (sidebarWidth / 2)
+            scrollContainerRef.current.scrollLeft = Math.max(0, scrollPos)
+        }
+    }, [])
+
+    const getPosition = (start: Date, end: Date | null) => {
+        const actualEnd = end || addDays(start, 1) // Default to 1 day if no end
         const daysFromStart = differenceInDays(start, rangeStart)
-        const duration = differenceInDays(end, start) + 1
+        const duration = Math.max(0.5, differenceInDays(actualEnd, start)) // Allow small durations
         return {
             left: daysFromStart * minDayWidth,
-            width: Math.max(duration * minDayWidth, minDayWidth)
+            width: duration * minDayWidth
         }
     }
 
     return (
-        <Card className="mb-8 w-full min-w-0 overflow-hidden">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <GanttChartSquare className="h-5 w-5" />
-                    Cronograma Geral de Projetos
-                </CardTitle>
-                <div className="flex gap-4 text-sm mt-2">
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-                        <span>Implementação</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-emerald-500 rounded-sm"></div>
-                        <span>Manutenção (Go-live)</span>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="p-0 overflow-hidden w-full">
+        <Card className="mb-8 w-full border-white/[0.03] shadow-none bg-[#1c1d3e]/15 overflow-hidden">
+            <CardContent className="p-0 relative">
                 <div
                     ref={scrollContainerRef}
-                    className="w-full min-w-0 overflow-x-auto border-t border-border bg-slate-50 dark:bg-slate-900/50"
-                    style={{ maxWidth: '100%' }}
+                    className="max-h-[60vh] min-h-[400px] w-full overflow-x-auto overflow-y-auto select-none bg-slate-100/10 dark:bg-slate-900/10 transition-colors"
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
+                    style={{ cursor: 'grab' }}
                 >
-                    <div style={{ width: `${timelineWidth + 250}px` }} className="flex flex-col h-full"> {/* +250 for Sidebar */}
-                        {/* Timeline Header */}
-                        <div className="grid grid-cols-[250px_1fr] border-b border-border sticky top-0 z-20 bg-white dark:bg-card">
-                            <div className="px-4 py-2 font-semibold text-xs text-muted-foreground border-r border-border flex items-end pb-2">
-                                PROJETO
+                    <div className="relative flex flex-col min-w-max pb-4">
+                        {/* Linha de Datas (Sticky) */}
+                        <div className="flex bg-[#121226] border-b border-white/[0.03] sticky top-0 z-40">
+                            <div className="flex-shrink-0 border-r border-white/[0.03] bg-[#121226] flex items-center px-6 py-4 sticky left-0 z-50 shadow-[6px_0_15px_-4px_rgba(0,0,0,0.2)]" style={{ width: `${sidebarWidth}px` }}>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Projeto / Cliente</span>
                             </div>
-                            <div className="relative h-10">
-                                <div className="flex absolute inset-0">
-                                    {allDays.map((day, index) => {
-                                        const isFirstOfMonth = day.getDate() === 1
-                                        const isToday = isSameDay(day, today)
-                                        return (
-                                            <div
-                                                key={index}
-                                                className={`flex-shrink-0 border-r border-border/50 text-[10px] flex items-end justify-center pb-2 ${isToday ? 'bg-blue-100/50 dark:bg-blue-900/20 font-bold' : ''}`}
-                                                style={{ width: `${minDayWidth}px` }}
-                                            >
-                                                {isFirstOfMonth ? (
-                                                    <span className="font-bold">{format(day, 'MMM', { locale: ptBR }).toUpperCase()}</span>
-                                                ) : (
-                                                    <span className="text-muted-foreground/70">{format(day, 'dd')}</span>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
+                            <div className="flex">
+                                {allDays.map((day, index) => {
+                                    const isMonthStart = day.getDate() === 1
+                                    const isWeekend = day.getDay() === 0 || day.getDay() === 6
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`flex-shrink-0 border-r border-white/[0.03] text-center py-4 relative ${isWeekend ? 'bg-white/[0.02]' : ''}`}
+                                            style={{ width: `${minDayWidth}px` }}
+                                        >
+                                            {isMonthStart && (
+                                                <span className="absolute -top-0.5 left-1.5 text-[8px] font-bold text-blue-500 uppercase tracking-tighter">
+                                                    {format(day, 'MMM', { locale: ptBR })}
+                                                </span>
+                                            )}
+                                            <span className={`text-[10px] font-bold ${isSameDay(day, today) ? 'text-white bg-rose-500 px-1.5 py-0.5 rounded shadow-lg shadow-rose-500/40' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                {format(day, 'dd')}
+                                            </span>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </div>
 
-                        {/* Projects Rows */}
-                        <div className="max-h-[200px] w-full max-w-full overflow-y-auto custom-scrollbar">
-                            <div className="relative">
-                                {/* Vertical Grid Lines (Background) */}
-                                <div className="absolute inset-0 grid grid-cols-[250px_1fr] pointer-events-none">
-                                    <div className="border-r border-border bg-white dark:bg-card z-10"></div>
-                                    <div className="flex h-full">
-                                        {allDays.map((day, index) => {
-                                            const isWeekend = day.getDay() === 0 || day.getDay() === 6
-                                            const isToday = isSameDay(day, today)
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    className={`flex-shrink-0 border-r border-border/30 h-full ${isWeekend ? 'bg-slate-100/30 dark:bg-slate-800/30' : ''} ${isToday ? 'bg-blue-50/30 dark:bg-blue-900/10 border-blue-200' : ''}`}
-                                                    style={{ width: `${minDayWidth}px` }}
-                                                />
-                                            )
-                                        })}
+                        <div className="relative">
+                            {/* Grid Background */}
+                            <div className="absolute inset-0 pointer-events-none flex">
+                                <div className="sticky left-0 border-r border-white/5 bg-[#0f172a]/40 z-10 shadow-[6px_0_15px_-4px_rgba(0,0,0,0.3)]" style={{ width: `${sidebarWidth}px`, flexShrink: 0 }}></div>
+                                <div className="flex h-full relative">
+                                    {allDays.map((_, index) => (
+                                        <div key={index} className="flex-shrink-0 border-r border-white/[0.03] h-full" style={{ width: `${minDayWidth}px` }} />
+                                    ))}
+                                    {/* Today Pivot Line */}
+                                    <div
+                                        className="absolute top-0 bottom-0 w-[2px] bg-rose-500/50 z-30"
+                                        style={{ left: `${differenceInDays(today, rangeStart) * minDayWidth + (minDayWidth / 2)}px` }}
+                                    >
+                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1px] h-full bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.8)]" />
+                                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 px-2 py-1 bg-rose-500 text-[8px] text-white font-bold rounded-full uppercase whitespace-nowrap shadow-xl border border-white/20">Hoje</div>
                                     </div>
                                 </div>
+                            </div>
 
-                                {projects.map(project => (
-                                    <div key={project.id} className="grid grid-cols-[250px_1fr] border-b border-border/50 relative hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-
-                                        {/* Sidebar Info */}
-                                        <div className="px-4 py-3 border-r border-border bg-white/50 dark:bg-card/50 backdrop-blur-sm z-10 relative">
-                                            <div className="text-sm font-medium truncate" title={project.name}>{project.name}</div>
-                                            <div className="text-xs text-muted-foreground truncate" title={project.clientName}>{project.clientName}</div>
+                            {/* Conteúdo Real */}
+                            <div className="relative z-20">
+                                {projects.map((project) => (
+                                    <div key={project.id} className="border-b border-white/[0.02] hover:bg-white/[0.01] transition-all group flex">
+                                        <div className="px-6 py-5 border-r border-white/[0.03] flex flex-col justify-center bg-[#121226] transition-all sticky left-0 z-30 shadow-[6px_0_15px_-4px_rgba(0,0,0,0.2)]" style={{ width: `${sidebarWidth}px`, flexShrink: 0 }}>
+                                            <div className="text-[12px] font-bold text-slate-200 truncate flex items-center gap-2" title={project.name}>
+                                                <div className="w-2 h-2 rounded-full bg-[#4dbaaf] shrink-0 shadow-[0_0_8px_rgba(77,186,175,0.3)]" />
+                                                {project.name}
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 font-medium tracking-wider truncate uppercase mt-1 pl-4" title={project.clientName}>
+                                                {project.clientName}
+                                            </div>
                                         </div>
 
-                                        {/* Bars Container */}
-                                        <div className="relative h-full min-h-[50px]">
-                                            {/* Implementation Bar */}
-                                            {project.implementationEnd && (
-                                                <div
-                                                    className="absolute top-2 h-4 bg-blue-500 rounded-sm shadow-sm hover:brightness-110 transition-all cursor-help z-20"
-                                                    style={getPosition(project.implementationStart, project.implementationEnd)}
-                                                    title={`Implementação\n${format(project.implementationStart, 'dd/MM')} - ${format(project.implementationEnd, 'dd/MM')}`}
-                                                />
-                                            )}
+                                        <div className="relative h-[72px] py-4">
+                                            {project.phases.map((phase, idx) => {
+                                                const start = phase.start instanceof Date ? phase.start : new Date(phase.start)
+                                                const end = phase.end ? (phase.end instanceof Date ? phase.end : new Date(phase.end)) : null
 
-                                            {/* Maintenance Bar */}
-                                            {project.maintenanceStart && project.maintenanceEnd && (
-                                                <div
-                                                    className="absolute top-7 h-4 bg-emerald-500 rounded-sm shadow-sm hover:brightness-110 transition-all cursor-help z-20"
-                                                    style={getPosition(project.maintenanceStart, project.maintenanceEnd)}
-                                                    title={`Manutenção\n${format(project.maintenanceStart, 'dd/MM')} - ${format(project.maintenanceEnd, 'dd/MM')}`}
-                                                />
-                                            )}
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        className="absolute h-8 rounded-md transition-all cursor-pointer flex items-center px-3 border border-white/5"
+                                                        style={{
+                                                            ...getPosition(start, end),
+                                                            backgroundColor: '#4dbaaf',
+                                                            top: '50%',
+                                                            transform: 'translateY(-50%)'
+                                                        }}
+                                                        title={`${phase.name}: ${format(start, 'dd/MM')} até ${end ? format(end, 'dd/MM') : '?'}`}
+                                                    >
+                                                        <span className="text-[10px] text-[#121226] font-bold truncate relative z-10">{phase.name}</span>
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 ))}

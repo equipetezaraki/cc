@@ -9,6 +9,8 @@ interface FinancialSummaryProps {
         currentMRR: number
         totalImplementation: number
         upcomingRevenue: number
+        currentExpenses: number
+        netMRR: number
     }
 }
 
@@ -29,16 +31,30 @@ export function FinancialSummary({ summary }: FinancialSummaryProps) {
             color: "text-blue-600 dark:text-blue-400"
         },
         {
+            title: "Gastos (Mês Atual)",
+            value: `R$ ${summary.currentExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            description: "Despesas fixas e pontuais",
+            icon: Calendar,
+            color: "text-red-600 dark:text-red-400"
+        },
+        {
+            title: "Lucro Líquido (MRR)",
+            value: `R$ ${summary.netMRR.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            description: "MRR - Gastos",
+            icon: TrendingUp,
+            color: summary.netMRR >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+        },
+        {
             title: "Impl. Total",
             value: `R$ ${summary.totalImplementation.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
             description: "Total acumulado de implementação",
             icon: Briefcase,
-            color: "text-green-600 dark:text-green-400"
+            color: "text-zinc-600 dark:text-zinc-400"
         },
         {
-            title: "Próximos 90 Dias",
+            title: "Forecast (90 Dias)",
             value: `R$ ${summary.upcomingRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-            description: "Projeção de recebimento (Forecast)",
+            description: "Projeção de recebimento bruto",
             icon: Calendar,
             color: "text-orange-600 dark:text-orange-400"
         }

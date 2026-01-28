@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { getClientProject, getDashboardMetrics, getAiAnalyticsTimeSeries } from './actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
-import { Users, MessageSquare, Clock, Bot, AlertCircle, Moon, BarChart3, Receipt, ArrowRight } from 'lucide-react'
+import { Users, MessageSquare, Clock, Bot, AlertCircle, Moon, BarChart3, Receipt, ArrowRight, ExternalLink } from 'lucide-react'
 import { ClientOnboarding } from "@/components/client-onboarding"
 import { DashboardWidget } from "@/components/dashboard/dashboard-widget"
 import { AIAnalyticsSection } from "@/components/dashboard/ai-analytics-section"
@@ -46,7 +46,7 @@ export default function DashboardPage() {
     // Load Metrics when Date Range or Project changes
     useEffect(() => {
         async function loadMetrics() {
-            if (!project || project.status === 'ONBOARDING') return
+            if (!project) return
 
             setLoadingMetrics(true)
             try {
@@ -79,30 +79,6 @@ export default function DashboardPage() {
         )
     }
 
-    // Check for Onboarding Status
-    if (project.status === 'ONBOARDING') {
-        return (
-            <div className="animate-in fade-in duration-500">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight">Bem-vindo, {project.name}</h1>
-                    <p className="text-muted-foreground">
-                        Estamos preparando tudo para o seu projeto. Por favor, complete as etapas abaixo.
-                    </p>
-                </div>
-                <ClientOnboarding
-                    projectId={project.id}
-                    faqLink={project.faqLink}
-                    initialData={{
-                        openAiKey: project.openAiKey,
-                        openRouterKey: project.openRouterKey,
-                        faqConfirmed: project.faqConfirmed,
-                        speakingStyleConfirmed: project.speakingStyleConfirmed,
-                    }}
-                    hasPendingOnboardingTask={project.hasPendingOnboardingTask}
-                />
-            </div>
-        )
-    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
@@ -110,9 +86,11 @@ export default function DashboardPage() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-                    <p className="text-muted-foreground">
-                        Visão analítica de <span className="font-semibold text-foreground">{project.name}</span>
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-muted-foreground">
+                            Visão analítica de <span className="font-semibold text-foreground">{project.name}</span>
+                        </p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-4">
                     <BusinessHoursSettings

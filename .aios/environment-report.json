@@ -1,0 +1,76 @@
+{
+  "generated_at": "2025-01-28T00:00:00Z",
+  "project_name": "gestao-tzk",
+  "system": {
+    "os": "Windows 11",
+    "architecture": "x64",
+    "user": "merco",
+    "hostname": "DESKTOP"
+  },
+  "cli_tools": {
+    "git": {
+      "installed": true,
+      "version": "2.52.0",
+      "path": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "status": "✅ OK"
+    },
+    "gh": {
+      "installed": true,
+      "version": "2.85.0",
+      "path": "C:\\Program Files\\GitHub CLI\\gh.exe",
+      "authenticated": false,
+      "status": "⚠️ INSTALLED - Needs authentication"
+    },
+    "node": {
+      "installed": true,
+      "version": "v22.22.0",
+      "status": "✅ OK"
+    },
+    "npm": {
+      "installed": true,
+      "version": "10.9.4",
+      "status": "✅ OK"
+    },
+    "supabase": {
+      "installed": false,
+      "status": "❌ NOT INSTALLED"
+    },
+    "railway": {
+      "installed": false,
+      "status": "❌ NOT INSTALLED"
+    },
+    "docker": {
+      "installed": false,
+      "status": "❌ NOT INSTALLED"
+    },
+    "coderabbit": {
+      "installed": false,
+      "status": "❌ NOT INSTALLED"
+    }
+  },
+  "repository": {
+    "initialized": true,
+    "remote_url": "https://github.com/tezaraki/Gestao_TZK.git",
+    "branch": "master",
+    "has_commits": true
+  },
+  "project_structure": {
+    "has_package_json": true,
+    "has_aios_config": true,
+    "has_docs": true,
+    "has_src": true,
+    "has_prisma": true,
+    "structure": "✅ Complete - Next.js fullstack with Prisma"
+  },
+  "validation": {
+    "essential_complete": true,
+    "recommended_complete": false,
+    "ready_for_development": true,
+    "actions_required": [
+      "Authenticate GitHub CLI: gh auth login",
+      "Deploy .claude/CLAUDE.md to team"
+    ]
+  },
+  "mode": "YOLO",
+  "status": "✅ BOOTSTRAP COMPLETE"
+}

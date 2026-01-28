@@ -55,7 +55,7 @@ async function main() {
                 projectId,
                 sessionId: `session-${i}`,
                 leadName: `Lead Teste ${i + 1}`,
-                funnelStage: stage,
+                stage,
                 createdAt: subDays(new Date(), Math.floor(Math.random() * 30)),
                 dtUltimaMensagem: new Date(),
             }

@@ -28,7 +28,11 @@ export async function getProjectDetails(id: string) {
         notFound()
     }
 
-    return project
+    const templates = await prisma.stageTemplate.findMany({
+        orderBy: { stageNumber: 'asc' }
+    })
+
+    return { ...project, templates }
 }
 
 export async function saveFaqLink(projectId: string, faqLink: string) {
@@ -59,6 +63,7 @@ export async function saveFaqLink(projectId: string, faqLink: string) {
         revalidatePath(`/projects/${projectId}`)
         revalidatePath('/dashboard')
         revalidatePath('/deliveries')
+        revalidatePath('/client/setup')
 
         return { success: true }
     } catch (error) {

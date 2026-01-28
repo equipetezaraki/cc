@@ -109,6 +109,7 @@ export default async function ProjectDetailsPage({ params }: PageProps) {
                                 stages={project.stages}
                                 projectStartDate={project.startDate}
                                 funnelCount={project.funnelCount}
+                                templates={project.templates}
                             />
                         </div>
                         <div className="space-y-4">
@@ -117,6 +118,7 @@ export default async function ProjectDetailsPage({ params }: PageProps) {
                                 currentStep={project.currentStep}
                                 stages={project.stages}
                                 userRole={userRole}
+                                templates={project.templates}
                             />
                         </div>
                     </div>

@@ -2,7 +2,7 @@
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { BarChart3, KanbanSquare, LayoutDashboard, PlusCircle, Settings, Archive, Users, LogOut, ClipboardList, Layers, MessageSquare } from "lucide-react"
+import { BarChart3, KanbanSquare, LayoutDashboard, PlusCircle, Settings, Archive, Users, LogOut, ClipboardList, Layers, MessageSquare, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRole } from "@/contexts/role-context"
@@ -80,6 +80,13 @@ const sidebarItems = [
         roles: ['CLIENT']
     },
     {
+        title: "Configuração IA",
+        href: "/client/setup",
+        icon: Settings,
+        variant: "ghost",
+        roles: ['CLIENT']
+    },
+    {
         title: "Feedbacks IA",
         href: "/feedbacks",
         icon: MessageSquare,
@@ -93,7 +100,11 @@ import { ModeToggle } from "@/components/mode-toggle"
 
 // ... imports
 
-export function Sidebar() {
+interface SidebarProps {
+    faqLink?: string | null
+}
+
+export function Sidebar({ faqLink }: SidebarProps) {
     const pathname = usePathname()
     const { role } = useRole()
 
@@ -141,6 +152,7 @@ export function Sidebar() {
                                     </Link>
                                 )
                             })}
+
                         </div>
                     </div>
                     <div className="px-3 py-2">

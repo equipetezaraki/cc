@@ -2,7 +2,7 @@ import { getFinancialClients } from "./actions"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, ArrowRight, LayoutDashboard, History } from "lucide-react"
+import { Users, ArrowRight, LayoutDashboard, History, Receipt } from "lucide-react"
 
 export default async function FinancialPage() {
     const clients = await getFinancialClients()
@@ -17,6 +17,12 @@ export default async function FinancialPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Link href="/admin/financial/expenses">
+                        <Button variant="outline" className="border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10">
+                            <Receipt className="h-4 w-4 mr-2" />
+                            Gestão de Despesas
+                        </Button>
+                    </Link>
                     <Link href="/admin/financial/history">
                         <Button variant="outline">
                             <History className="h-4 w-4 mr-2" />
@@ -40,9 +46,9 @@ export default async function FinancialPage() {
                     const now = new Date()
                     const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-                    const hasActiveContract = client.projects.some(p => {
+                    const hasActiveContract = client.projects.some((p: any) => {
                         const projectContracts = p.contracts || []
-                        return projectContracts.some(c => {
+                        return projectContracts.some((c: any) => {
                             if (!c.isActive) return false
                             if (!c.paymentStartDate || !c.durationMonths) return false
 

@@ -14,35 +14,20 @@ interface ProjectStage {
     endDate: Date | null
 }
 
+interface StageTemplate {
+    id: string
+    name: string
+    stageNumber: number
+}
+
 interface StageGanttProps {
     stages: ProjectStage[]
     projectStartDate: Date
     funnelCount: number
+    templates: StageTemplate[]
 }
 
-const STAGE_NAMES = [
-    "N/A",
-    "1. Definição / Reunião",
-    "2. Validação de Esboços",
-    "3. Setup & Automações",
-    "4. Desenvolvimento de Funis",
-    "5. Go-Live",
-    "6. Maturação",
-    "7. Entrega Final"
-]
-
-// Duração estimada de cada etapa em dias úteis
-const STAGE_DURATIONS = {
-    1: 2,   // Definição
-    2: 3,   // Validação
-    3: 3,   // Setup
-    4: 3,   // Por funil
-    5: 1,   // Go-Live
-    6: 30,  // Maturação (dias corridos)
-    7: 1    // Entrega Final
-}
-
-export function StageGantt({ stages, projectStartDate, funnelCount }: StageGanttProps) {
+export function StageGantt({ stages, projectStartDate, funnelCount, templates }: StageGanttProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [isDragging, setIsDragging] = useState(false)
     const [startX, setStartX] = useState(0)
@@ -102,30 +87,37 @@ export function StageGantt({ stages, projectStartDate, funnelCount }: StageGantt
         return acc
     }, {} as Record<number, ProjectStage[]>)
 
-    for (let stageNum = 1; stageNum <= 7; stageNum++) {
-        if (stageNum === 1) continue; // Skip Stage 1
+    // Map templates for easier lookup
+    const templateMap = templates.reduce((acc, t) => {
+        acc[t.stageNumber] = t.name
+        return acc
+    }, {} as Record<number, string>)
 
+    const sortedStageNumbers = Object.keys(stagesByNumber).map(Number).sort((a, b) => a - b)
+
+    for (const stageNum of sortedStageNumbers) {
         const stageItems = stagesByNumber[stageNum] || []
+        const stageName = templateMap[stageNum] || `Etapa ${stageNum}`
 
-        if (stageNum === 4) {
-            // Etapa 4: uma linha por funil
+        if (stageItems.length > 1 || (stageItems.length > 0 && stageItems[0].funnelNumber !== null)) {
+            // Multiple items or explicit funnel number -> render as funnels
             stageItems.sort((a, b) => (a.funnelNumber || 0) - (b.funnelNumber || 0))
             stageItems.forEach((stage) => {
                 if (stage.startDate && stage.endDate) {
                     stageTimeline.push({
                         stage,
-                        name: `Funil ${stage.funnelNumber}`,
+                        name: stage.funnelNumber ? `Funil ${stage.funnelNumber}` : stageName,
                         startDate: new Date(stage.startDate),
                         endDate: new Date(stage.endDate)
                     })
                 }
             })
         } else {
-            // Outras etapas: uma linha única
+            // Single standard item
             if (stageItems.length > 0 && stageItems[0].startDate && stageItems[0].endDate) {
                 stageTimeline.push({
                     stage: stageItems[0],
-                    name: STAGE_NAMES[stageNum],
+                    name: stageName,
                     startDate: new Date(stageItems[0].startDate),
                     endDate: new Date(stageItems[0].endDate)
                 })

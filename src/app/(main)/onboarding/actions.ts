@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { onboardingSchema } from '@/lib/schemas'
 import { calculateBusinessDate, addBusinessDays } from '@/lib/date-utils'
+import { calculateProjectGoLiveDate } from '@/lib/project-utils'
+import { addDays } from 'date-fns'
 import { generateStandardTasks } from '../deliveries/actions'
 import { ensureClientFolder } from '@/lib/google-drive'
 import bcrypt from 'bcryptjs'
@@ -56,14 +58,11 @@ export async function submitBriefing(data: any) {
     const { flowchartData } = data
 
     // Calculate Go-Live Date
-    // +30 days -> Corrente
-    // +60 days -> Premium
-    const daysToAdd = projectType === 'Corrente' ? 30 : 60
-    const goLiveDate = addBusinessDays(new Date(), daysToAdd) // or simple date add? User said "Data Prevista" logic. 
-    // Usually business days or calendar days. "30 dias" implies calendar days mostly, but let's use date-fns addDays if available or just addBusinessDays if that's what we have.
-    // The import says `addBusinessDays`. I'll stick to that or `addDays` if I import it.
-    // Let's assume calendar days for simplicity unless specified "úteis".
-    // User: "+30 dias". Standard is calendar.
+    const goLiveDate = calculateProjectGoLiveDate({
+        projectType: projectType || 'Tezaraki Essential',
+        funnelCount: funnelCount || 1,
+        startDate: new Date()
+    })
 
     const startDate = new Date()
 
@@ -155,31 +154,47 @@ export async function submitBriefing(data: any) {
             }
         })
 
-        // 3.2 Create Task for Product Owner to start onboarding
-        await prisma.task.create({
-            data: {
-                title: "Iniciar onboarding com cliente",
-                description: `Confirmar recebimento de credenciais, documentos para a base de conhecimento e requisitos preenchidos. Agendar reunião de alinhamento com o cliente.`,
-                plannedStart: new Date(),
-                plannedEnd: calculateBusinessDate(new Date(), 1), // 1 day SLA
-                assignedRole: 'PRODUCT_OWNER',
-                projectId: project.id,
-                isCompleted: false
-            }
+        // 3. Create Initial Stages and Tasks from Stage 1 Template
+        const stage1Template = await prisma.stageTemplate.findFirst({
+            where: { stageNumber: 1 },
+            include: { tasks: true }
         })
 
-        // 3.3 Create Task for Product Owner to attach FAQ link
-        await prisma.task.create({
-            data: {
-                title: "Anexar Link do FAQ do Cliente",
-                description: `Acesse o projeto e anexe o link do FAQ do cliente ${companyName}. O FAQ foi criado automaticamente no Google Drive.`,
-                plannedStart: new Date(),
-                plannedEnd: calculateBusinessDate(new Date(), 1), // 1 day SLA
-                assignedRole: 'PRODUCT_OWNER',
-                projectId: project.id,
-                isCompleted: false
-            }
-        })
+        if (stage1Template) {
+            // 3.1 Create Stage 1 record
+            console.log('🏁 Creating Stage 1 record...')
+            await prisma.projectStage.create({
+                data: {
+                    projectId: project.id,
+                    stageNumber: 1,
+                    startDate: new Date(),
+                    endDate: calculateBusinessDate(new Date(), stage1Template.durationDays || 2),
+                    isCompleted: false
+                }
+            })
+
+            // 3.2 Create Stage 1 tasks
+            console.log('📋 Creating Stage 1 tasks...')
+            await prisma.task.createMany({
+                data: stage1Template.tasks
+                    .filter(t => t.title !== "Documentar Onboarding por WhatsApp")
+                    .map(taskTpl => {
+                        const plannedStart = new Date()
+                        const plannedEnd = calculateBusinessDate(plannedStart, taskTpl.durationDays || 0)
+
+                        return {
+                            title: taskTpl.title,
+                            description: taskTpl.description,
+                            plannedStart,
+                            plannedEnd,
+                            assignedRole: taskTpl.role,
+                            projectId: project.id,
+                            stageRef: 1,
+                            isCompleted: false
+                        }
+                    })
+            })
+        }
 
         // 4. Send Webhook Notification
         await sendWebhookNotification({

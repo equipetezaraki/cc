@@ -21,7 +21,7 @@ export default async function BriefingPage({ params }: PageProps) {
                 <p className="text-muted-foreground">Preencha as informações de contexto e desenhe os funis para o time de CRM e IA.</p>
             </div>
 
-            <BriefingForm projectId={project.id} initialData={project.briefing} />
+            <BriefingForm project={project} />
         </div>
     )
 }

@@ -151,6 +151,15 @@ export type FinancialItem = {
     clientName: string
 }
 
+export type ExpenseItem = {
+    id: string
+    description: string
+    amount: number
+    type: 'RECURRING' | 'ONE_TIME'
+    date: Date
+    month: string
+}
+
 export async function getFinancialForecast() {
     // Fetch all contracts with their installments
     const contracts = await prisma.projectContract.findMany({
@@ -166,6 +175,11 @@ export async function getFinancialForecast() {
                 }
             }
         }
+    })
+
+    // Fetch all active expenses
+    const expenses = await prisma.expense.findMany({
+        where: { isActive: true }
     })
 
     const allItems: FinancialItem[] = []
@@ -189,10 +203,23 @@ export async function getFinancialForecast() {
         })
     })
 
+    const expenseItems: ExpenseItem[] = expenses.map(expense => {
+        const date = new Date(expense.date)
+        return {
+            id: expense.id,
+            description: expense.description,
+            amount: expense.amount,
+            type: expense.type,
+            date: date,
+            month: `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
+        }
+    })
+
     // Sort items by date
     allItems.sort((a, b) => a.date.getTime() - b.date.getTime())
 
     return {
-        items: allItems
+        items: allItems,
+        expenses: expenseItems
     }
 }

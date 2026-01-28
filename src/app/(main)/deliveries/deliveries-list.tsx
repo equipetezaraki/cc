@@ -270,7 +270,7 @@ export function DeliveriesList({ tasks, userRole }: { tasks: TaskWithProject[], 
                                                 Ir para o Projeto
                                             </a>
                                         )}
-                                        {task.title === "Agendar Apresentação de Esboços" && !task.isCompleted && (
+                                        {(task.title === "Agendar Apresentação de Esboços" || task.title === "Iniciar onboarding com cliente" || task.title === "Agendar Onboarding") && !task.isCompleted && (
                                             <div className="mt-2">
                                                 <ScheduleMeetingDialog taskId={task.id} />
                                             </div>

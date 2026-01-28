@@ -1,10 +1,13 @@
 import { Sidebar } from "@/components/sidebar"
+import { getClientProject } from "@/app/(main)/dashboard/actions"
 
-export default function MainLayout({
+export default async function MainLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
+    const project = await getClientProject()
+
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-background">
             <Sidebar />

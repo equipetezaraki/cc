@@ -31,7 +31,7 @@ export async function saveClientOnboardingData(projectId: string, data: z.infer<
 
 export async function submitClientOnboarding(projectId: string, data: { openAiKey: string, openRouterKey: string, faqConfirmed: boolean }) {
     try {
-        if (!data.openAiKey || !data.openRouterKey || !data.faqConfirmed) {
+        if (!data.openAiKey || !data.openRouterKey) {
             return { error: "Preencha todos os campos obrigatórios." }
         }
 
@@ -41,15 +41,11 @@ export async function submitClientOnboarding(projectId: string, data: { openAiKe
             data: {
                 openAiKey: data.openAiKey,
                 openRouterKey: data.openRouterKey,
-                faqConfirmed: data.faqConfirmed,
-                // Status remains ONBOARDING until PO schedules the meeting
+                faqConfirmed: true,
+                speakingStyleConfirmed: true, // Auto-confirm since we removed the block
             }
         })
 
-        // 1.2 Check if speaking style is confirmed
-        if (!project.speakingStyleConfirmed) {
-            return { error: "Aguarde a definição do estilo de fala com a IA no WhatsApp." }
-        }
 
         // 1.5 Check if task already exists to prevent duplicates
         const existingTask = await prisma.task.findFirst({

@@ -3,11 +3,12 @@
 import { useState, useTransition, useCallback, useMemo, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { format } from "date-fns"
+import { format, addDays } from "date-fns"
 import { CalendarIcon, Loader2, Plus, Trash2, Save } from "lucide-react"
 import { useTheme } from 'next-themes'
 
 import { cn } from "@/lib/utils"
+import { addBusinessDays } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -81,21 +82,47 @@ export function OnboardingForm() {
             funnelCount: 1,
             segment: "",
             operationSize: "Pequena",
-            projectType: "Corrente",
+            projectType: "Tezaraki Essential",
             technicalBriefingUrl: "",
         },
     })
 
-    // Watch project type to update Go-Live Date
+    // Watch values to update Go-Live Date
     const projectType = form.watch("projectType")
+    const funnelCount = form.watch("funnelCount")
 
     // Calculate Go-Live Date
-    const goLiveDate = useMemo(() => {
-        const days = projectType === 'Premium' ? 60 : 30
-        const date = new Date()
-        date.setDate(date.getDate() + days)
-        return format(date, 'dd/MM/yyyy')
-    }, [projectType])
+    const goLiveDateResult = useMemo(() => {
+        const today = new Date()
+        let date = today
+        let hint = ""
+
+        if (projectType === 'Tezaraki Essential') {
+            date = addDays(today, 30)
+            hint = "+30 dias corridos"
+        } else if (projectType === 'Tezaraki Pro') {
+            // 30 days calendar + 5 business days per extra funnel
+            const baseDate = addDays(today, 30)
+            const extraFunnels = Math.max(0, funnelCount - 1)
+            const extraBusinessDays = extraFunnels * 5
+
+            if (extraBusinessDays > 0) {
+                date = addBusinessDays(baseDate, extraBusinessDays)
+                hint = `+30 dias corridos + ${extraBusinessDays} dias úteis`
+            } else {
+                date = baseDate
+                hint = "+30 dias corridos"
+            }
+        } else if (projectType === 'Tezaraki Private') {
+            date = addDays(today, 90)
+            hint = "+90 dias de implementação"
+        }
+
+        return {
+            formattedDate: format(date, 'dd/MM/yyyy'),
+            hint
+        }
+    }, [projectType, funnelCount])
 
     // Flowchart State
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
@@ -522,18 +549,26 @@ export function OnboardingForm() {
                                         >
                                             <FormItem className="flex items-center space-x-3 space-y-0">
                                                 <FormControl>
-                                                    <RadioGroupItem value="Corrente" />
+                                                    <RadioGroupItem value="Tezaraki Essential" />
                                                 </FormControl>
                                                 <FormLabel className="font-normal">
-                                                    Corrente (≤ R$ 2.000 / mês)
+                                                    Tezaraki Essential (30 dias corridos)
                                                 </FormLabel>
                                             </FormItem>
                                             <FormItem className="flex items-center space-x-3 space-y-0">
                                                 <FormControl>
-                                                    <RadioGroupItem value="Premium" />
+                                                    <RadioGroupItem value="Tezaraki Pro" />
                                                 </FormControl>
                                                 <FormLabel className="font-normal">
-                                                    Premium (≥ R$ 4.000 / mês)
+                                                    Tezaraki Pro (30 dias + 5 dias úteis por funil extra)
+                                                </FormLabel>
+                                            </FormItem>
+                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                <FormControl>
+                                                    <RadioGroupItem value="Tezaraki Private" />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">
+                                                    Tezaraki Private (90 dias)
                                                 </FormLabel>
                                             </FormItem>
                                         </RadioGroup>
@@ -557,8 +592,8 @@ export function OnboardingForm() {
                     </div>
                     <div className="space-y-2">
                         <Label>Data Prevista de Go-Live</Label>
-                        <Input value={goLiveDate} disabled />
-                        <p className="text-xs text-muted-foreground">{projectType === 'Premium' ? '+60 dias' : '+30 dias'}</p>
+                        <Input value={goLiveDateResult.formattedDate} disabled />
+                        <p className="text-xs text-muted-foreground">{goLiveDateResult.hint}</p>
                     </div>
                 </div>
 

@@ -38,14 +38,12 @@ export function StageEditor({ stage, onUpdate }: StageEditorProps) {
     // Stage State
     const [name, setName] = useState(stage.name)
     const [duration, setDuration] = useState(stage.durationDays || 0)
-    const [trigger, setTrigger] = useState(stage.trigger || '')
     // const [kanbanColumn, setKanbanColumn] = useState(stage.kanbanColumn || '') // Hidden per user request
 
     const handleSaveStage = async () => {
         await updateStageTemplate(stage.id, {
             name,
             durationDays: duration,
-            trigger,
             // kanbanColumn
         })
         setHasChanges(false)
@@ -65,7 +63,6 @@ export function StageEditor({ stage, onUpdate }: StageEditorProps) {
                             <CardTitle className="text-xl">{stage.name}</CardTitle>
                             <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
                                 <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {stage.durationDays || 0} dias</span>
-                                {stage.trigger && <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> {stage.trigger}</span>}
                                 <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{stage.tasks.length} tarefas</span>
                             </div>
                         </div>
@@ -118,14 +115,6 @@ export function StageEditor({ stage, onUpdate }: StageEditorProps) {
                                         onChange={(e) => { setDuration(parseInt(e.target.value) || 0); setHasChanges(true) }}
                                     />
                                 </div>
-                                <div className="space-y-2 md:col-span-2">
-                                    <Label>Gatilho / Dependência</Label>
-                                    <Input
-                                        value={trigger}
-                                        onChange={(e) => { setTrigger(e.target.value); setHasChanges(true) }}
-                                        placeholder="O que inicia esta etapa?"
-                                    />
-                                </div>
                             </div>
                         </div>
 
@@ -164,8 +153,6 @@ function NewTaskDialog({ stageId, onUpdate }: { stageId: string, onUpdate: () =>
     const [description, setDescription] = useState('')
     const [role, setRole] = useState<Role>('CRM')
     const [duration, setDuration] = useState(0)
-    const [trigger, setTrigger] = useState('')
-
     const handleSubmit = async () => {
         if (!title) return
         setLoading(true)
@@ -174,7 +161,6 @@ function NewTaskDialog({ stageId, onUpdate }: { stageId: string, onUpdate: () =>
             description,
             role,
             durationDays: duration,
-            trigger
         })
         setLoading(false)
 
@@ -188,7 +174,6 @@ function NewTaskDialog({ stageId, onUpdate }: { stageId: string, onUpdate: () =>
         // Reset form
         setTitle('')
         setDescription('')
-        setTrigger('')
         setDuration(0)
         setRole('CRM')
 
@@ -237,10 +222,6 @@ function NewTaskDialog({ stageId, onUpdate }: { stageId: string, onUpdate: () =>
                             <Input id="duration" type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 0)} />
                         </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="trigger">Gatilho (Opcional)</Label>
-                        <Input id="trigger" value={trigger} onChange={(e) => setTrigger(e.target.value)} placeholder="Ex: Após etapa anterior" />
-                    </div>
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
@@ -261,15 +242,12 @@ function TaskItem({ task, onUpdate }: { task: any, onUpdate: () => void }) {
     const [description, setDescription] = useState(task.description || '')
     const [role, setRole] = useState<Role>(task.role)
     const [duration, setDuration] = useState(task.durationDays || 0)
-    const [trigger, setTrigger] = useState(task.trigger || '')
-
     const handleSave = async () => {
         await updateTaskTemplate(task.id, {
             title,
             description,
             role,
             durationDays: duration,
-            trigger
         })
         setHasChanges(false)
         setIsExpanded(false)
@@ -340,10 +318,6 @@ function TaskItem({ task, onUpdate }: { task: any, onUpdate: () => void }) {
                         <div className="space-y-1">
                             <Label className="text-xs">Duração (dias)</Label>
                             <Input type="number" value={duration} onChange={(e) => { setDuration(parseInt(e.target.value) || 0); setHasChanges(true) }} className="h-8" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-xs">Gatilho (Opcional)</Label>
-                            <Input value={trigger} onChange={(e) => { setTrigger(e.target.value); setHasChanges(true) }} className="h-8" placeholder="Ex: Após aprovação do cliente" />
                         </div>
                     </div>
                 </div>

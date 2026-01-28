@@ -4,7 +4,7 @@ import { KanbanBoard } from "./kanban-board"
 export const dynamic = 'force-dynamic'
 
 export default async function KanbanPage() {
-    const projects = await getProjects()
+    const { projects, templates } = await getProjects()
 
     return (
         <div className="h-[calc(100vh-4rem)] flex flex-col">
@@ -12,7 +12,7 @@ export default async function KanbanPage() {
                 <h1 className="text-xl font-bold">Quadro de Projetos</h1>
             </header>
             <main className="flex-1 overflow-hidden p-4 bg-background/50">
-                <KanbanBoard initialProjects={projects} />
+                <KanbanBoard initialProjects={projects} templates={templates} />
             </main>
         </div>
     )
