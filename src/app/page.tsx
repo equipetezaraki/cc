@@ -1,16 +1,32 @@
-import { redirect } from "next/navigation"
-import { getSession } from "@/lib/auth"
+'use client'
 
-export default async function Home() {
-  const session = await getSession()
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
-  if (!session) {
-    redirect('/login')
-  }
+export default function Home() {
+  const router = useRouter()
 
-  if (session.user.role === 'CLIENT') {
-    redirect('/dashboard')
-  }
+  useEffect(() => {
+    // Get session from cookie and redirect based on role
+    const session = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('session='))
+      ?.split('=')[1]
 
-  redirect('/kanban')
+    if (!session) {
+      router.push('/login')
+      return
+    }
+
+    // Default redirect to kanban for authenticated users
+    router.push('/kanban')
+  }, [router])
+
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="text-center">
+        <p className="text-gray-500">Redirecting...</p>
+      </div>
+    </div>
+  )
 }
