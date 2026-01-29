@@ -15,9 +15,27 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    // If trying to access login page with session, redirect to home
+    // If trying to access login page with session, redirect to dashboard or kanban
     if (session && isLoginPage) {
-        return NextResponse.redirect(new URL('/', request.url))
+        try {
+            const secretKey = process.env.JWT_SECRET_KEY || 'secret-key-change-me'
+            const key = new TextEncoder().encode(secretKey)
+            const { payload } = await jwtVerify(session, key, {
+                algorithms: ['HS256'],
+            })
+
+            const role = (payload.user as any)?.role as string
+
+            // Redirect based on role
+            if (role === 'CLIENT') {
+                return NextResponse.redirect(new URL('/dashboard', request.url))
+            } else {
+                return NextResponse.redirect(new URL('/kanban', request.url))
+            }
+        } catch (error) {
+            console.error('Middleware decode error:', error)
+            return NextResponse.redirect(new URL('/dashboard', request.url))
+        }
     }
 
     // Role-based access control
